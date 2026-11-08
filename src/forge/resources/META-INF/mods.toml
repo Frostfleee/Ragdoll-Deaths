@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "${forgeRange}"
+license = "MIT"
+clientSideOnly = true
+
+[[mods]]
+modId = "ragdolldeaths"
+version = "${version}"
+displayName = "Ragdoll Deaths"
+authors = "Frostfleee"
+logoFile = "assets/ragdolldeaths/icon.png"
+displayTest = "IGNORE_ALL_VERSION"
+description = '''
+Every mob dies with its own jointed death animation that reacts to the killing blow: zombies fall back, horses roll onto their side, skeletons fall apart and blazes drop their rods. Client-side and purely visual.
+'''
+
+[[dependencies.ragdolldeaths]]
+modId = "forge"
+mandatory = true
+versionRange = "${forgeRange}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.ragdolldeaths]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraftRange}"
+ordering = "NONE"
+side = "CLIENT"

@@ -1,0 +1,36 @@
+{
+	"schemaVersion": 1,
+	"id": "ragdolldeaths",
+	"version": "${version}",
+	"name": "Ragdoll Deaths",
+	"description": "Every mob dies with its own jointed death animation that reacts to the killing blow: zombies fall back, horses roll onto their side, skeletons fall apart and blazes drop their rods. Client-side and purely visual.",
+	"authors": [
+		"Frostfleee"
+	],
+	"license": "MIT",
+	"icon": "assets/ragdolldeaths/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.frostfleee.ragdolldeaths.fabric.FabricClient"
+		],
+		"modmenu": [
+			"com.frostfleee.ragdolldeaths.fabric.ModMenuIntegration"
+		]
+	},
+	"mixins": [
+		{
+			"config": "ragdolldeaths.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.0",
+		"minecraft": "${minecraftRange}",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

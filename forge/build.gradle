@@ -1,0 +1,63 @@
+plugins {
+	id 'java'
+	id 'net.minecraftforge.gradle' version '[7.0.17,8)'
+}
+
+// A standalone build over the shared sources in ../src: the common code, the game-version compat code, and the
+// Forge entrypoint. Run it with ./gradlew -p forge build from the project root.
+def src = rootDir.toPath().resolve('../src').normalize().toFile()
+def compat = project.compat
+
+version = project.mod_version
+base {
+	archivesName = 'ragdoll-deaths-forge'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+sourceSets {
+	main {
+		java {
+			srcDirs = ["$src/main/java", "$src/$compat/java", "$src/forge/java", "$src/forgelike_$compat/java"]
+		}
+		resources {
+			srcDirs = ["$src/main/resources", "$src/forge/resources", "$src/forgelike/resources"]
+		}
+	}
+}
+
+repositories {
+	minecraft.mavenizer(it)
+	maven fg.forgeMaven
+	maven fg.minecraftLibsMaven
+	mavenCentral()
+}
+
+dependencies {
+	implementation minecraft.dependency("net.minecraftforge:forge:${project.forge_version}")
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
+processResources {
+	def props = [version: project.mod_version, minecraftRange: project.minecraft_range, forgeRange: project.forge_range]
+	inputs.properties props
+	filesMatching('META-INF/mods.toml') {
+		expand props
+	}
+	// Forge ships stock Mixin 0.8.7, which knows compatibility levels up to JAVA_21 and rejects JAVA_25.
+	filesMatching('ragdolldeaths.mixins.json') {
+		filter { it.replace('"JAVA_25"', '"JAVA_21"') }
+	}
+}
+
+jar {
+	manifest {
+		attributes('MixinConfigs': 'ragdolldeaths.mixins.json,ragdolldeaths.ghosts.mixins.json')
+	}
+	from("$src/../LICENSE") {
+		rename { "${it}_ragdolldeaths" }
+	}
+}

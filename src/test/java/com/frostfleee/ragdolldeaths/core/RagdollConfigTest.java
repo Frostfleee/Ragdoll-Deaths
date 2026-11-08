@@ -1,0 +1,121 @@
+package com.frostfleee.ragdolldeaths.core;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.google.gson.JsonParseException;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class RagdollConfigTest {
+	@Test
+	void defaultsMatchTheAgreedBehavior() {
+		RagdollConfig config = RagdollConfig.defaults();
+		assertTrue(config.enabled);
+		assertEquals(30, config.lifetimeTicks);
+		assertTrue(config.playerRagdolls);
+		assertEquals(WaterBehavior.FLOAT, config.waterBehavior);
+		assertTrue(config.lavaSink);
+		assertTrue(config.fallImpact);
+		assertEquals(1.0, config.hitReactionStrength);
+		assertEquals(60, config.ghostMaxTicks);
+		assertTrue(config.usesGhost("minecraft:ghast"));
+		assertTrue(config.usesGhost("minecraft:happy_ghast"));
+		assertFalse(config.isExcluded("minecraft:zombie"));
+	}
+
+	@Test
+	void missingFieldsFallBackToDefaults() {
+		RagdollConfig config = RagdollConfig.parse("{\"playerRagdolls\": false}");
+		assertFalse(config.playerRagdolls);
+		assertEquals(30, config.lifetimeTicks);
+		assertEquals(List.of("minecraft:ghast", "minecraft:happy_ghast"), config.ghostEntities);
+	}
+
+	@Test
+	void emptyDocumentGivesDefaults() {
+		assertEquals(RagdollConfig.defaults().toJson(), RagdollConfig.parse("").toJson());
+	}
+
+	@Test
+	void lifetimeIsClampedToItsRange() {
+		assertEquals(RagdollConfig.MAX_LIFETIME_TICKS, RagdollConfig.parse("{\"lifetimeTicks\": 200}").lifetimeTicks);
+		assertEquals(RagdollConfig.MIN_LIFETIME_TICKS, RagdollConfig.parse("{\"lifetimeTicks\": 0}").lifetimeTicks);
+		assertEquals(12, RagdollConfig.parse("{\"lifetimeTicks\": 12}").lifetimeTicks);
+	}
+
+	@Test
+	void numericValuesAreClamped() {
+		RagdollConfig config = RagdollConfig.parse("""
+				{"maxRenderDistance": 99999, "bounceStrength": -3, "hitReactionStrength": 7, "animationSpeed": 9, "wardenExtraTicks": 500,
+				 "ghostMaxTicks": 5, "maxActiveRagdolls": 0}
+				""");
+		assertEquals(512.0, config.maxRenderDistance);
+		assertEquals(0.0, config.bounceStrength);
+		assertEquals(2.0, config.animationSpeed);
+		assertEquals(RagdollConfig.MAX_WARDEN_EXTRA_TICKS, config.wardenExtraTicks);
+		assertEquals(2.0, config.hitReactionStrength);
+		assertEquals(RagdollConfig.DEFAULT_LIFETIME_TICKS, config.ghostMaxTicks);
+		assertEquals(1, config.maxActiveRagdolls);
+	}
+
+	@Test
+	void entityListsParseFromTypedText() {
+		assertEquals(List.of("minecraft:zombie", "somemod:worm"), RagdollConfig.splitIds(" zombie,somemod:worm ,, zombie "));
+		assertTrue(RagdollConfig.splitIds("   ").isEmpty());
+	}
+
+	@Test
+	void copyIsIndependent() {
+		RagdollConfig original = RagdollConfig.defaults();
+		RagdollConfig copy = original.copy();
+		copy.enabled = false;
+		assertTrue(original.enabled);
+	}
+
+	@Test
+	void ghostLimitNeverFallsBelowTheLifetime() {
+		RagdollConfig config = RagdollConfig.parse("{\"lifetimeTicks\": 50, \"ghostMaxTicks\": 25}");
+		assertEquals(50, config.ghostMaxTicks);
+	}
+
+	@Test
+	void unknownEnumValueFallsBackToDefault() {
+		assertEquals(WaterBehavior.FLOAT, RagdollConfig.parse("{\"waterBehavior\": \"BOUNCE\"}").waterBehavior);
+		assertEquals(WaterBehavior.SINK, RagdollConfig.parse("{\"waterBehavior\": \"SINK\"}").waterBehavior);
+	}
+
+	@Test
+	void entityIdsAreNormalized() {
+		RagdollConfig config = RagdollConfig.parse("""
+				{"excludedEntities": [" Zombie ", "somemod:Big_Worm", "", null, "zombie"],
+				 "ghostEntities": ["phantom"]}
+				""");
+		assertEquals(List.of("minecraft:zombie", "somemod:big_worm"), config.excludedEntities);
+		assertTrue(config.isExcluded("somemod:big_worm"));
+		assertTrue(config.usesGhost("minecraft:phantom"));
+		assertFalse(config.usesGhost("minecraft:ghast"));
+	}
+
+	@Test
+	void nullListsRestoreDefaults() {
+		RagdollConfig config = RagdollConfig.parse("{\"ghostEntities\": null, \"excludedEntities\": null}");
+		assertTrue(config.usesGhost("minecraft:ghast"));
+		assertTrue(config.excludedEntities.isEmpty());
+	}
+
+	@Test
+	void malformedJsonIsReported() {
+		assertThrows(JsonParseException.class, () -> RagdollConfig.parse("{\"enabled\": tru"));
+	}
+
+	@Test
+	void roundTripsThroughJson() {
+		RagdollConfig original = RagdollConfig.parse("{\"waterBehavior\": \"NEUTRAL\", \"bounceStrength\": 1.5}");
+		RagdollConfig copy = RagdollConfig.parse(original.toJson());
+		assertEquals(original.toJson(), copy.toJson());
+		assertEquals(WaterBehavior.NEUTRAL, copy.waterBehavior);
+	}
+}

@@ -1,0 +1,20 @@
+{
+	"required": true,
+	"package": "com.frostfleee.ragdolldeaths.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"EntityRendererMixin",
+		"EntityRenderStateMixin",
+		"LivingEntityMixin",
+		"LivingEntityRendererAccessor",
+		"LivingEntityRendererMixin",
+		"ModelFeatureRendererMixin",
+		"ModelPartAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

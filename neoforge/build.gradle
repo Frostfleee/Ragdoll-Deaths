@@ -1,0 +1,50 @@
+plugins {
+	id 'java'
+	id 'net.neoforged.moddev' version '2.0.148'
+}
+
+// A standalone build over the shared sources in ../src: the common code, the game-version compat code, and the
+// NeoForge entrypoint. Run it with ./gradlew -p neoforge build from the project root.
+def src = rootDir.toPath().resolve('../src').normalize().toFile()
+def compat = project.compat
+
+version = project.mod_version
+base {
+	archivesName = 'ragdoll-deaths-neoforge'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+sourceSets {
+	main {
+		java {
+			srcDirs = ["$src/main/java", "$src/$compat/java", "$src/neoforge/java", "$src/forgelike_$compat/java"]
+		}
+		resources {
+			srcDirs = ["$src/main/resources", "$src/neoforge/resources", "$src/forgelike/resources"]
+		}
+	}
+}
+
+neoForge {
+	version = project.neo_version
+	mods {
+		ragdolldeaths {
+			sourceSet(sourceSets.main)
+		}
+	}
+}
+
+processResources {
+	def props = [version: project.mod_version, minecraftRange: project.minecraft_range]
+	inputs.properties props
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand props
+	}
+}
+
+jar {
+	from("$src/../LICENSE") {
+		rename { "${it}_ragdolldeaths" }
+	}
+}

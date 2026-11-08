@@ -1,0 +1,90 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+// This root build makes the Fabric and Quilt jars; neoforge/ and forge/ are separate builds over the same sources.
+// Shared code is src/main. Version-specific code lives in src/<compat>/java (Compat and the mixins whose targets
+// moved): 26.1.x uses mc26_1, and 26.2 and later share mc26_2. -Ploader=quilt swaps fabric.mod.json for quilt.mod.json.
+def compat = project.findProperty('compat') ?: 'mc26_2'
+def loader = project.findProperty('loader') ?: 'fabric'
+
+sourceSets {
+	main {
+		java {
+			srcDir "src/${compat}/java"
+			srcDir 'src/fabric/java'
+			srcDir "src/fabric_${compat}/java"
+		}
+		resources {
+			srcDir "src/${loader}/resources"
+		}
+	}
+}
+
+version = "${project.mod_version}+${project.minecraft_range_name}"
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = 'TerraformersMC'
+		url = 'https://maven.terraformersmc.com/releases/'
+		content {
+			includeGroup 'com.terraformersmc'
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	compileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") {
+		transitive = false
+	}
+	localRuntime("com.terraformersmc:modmenu:${project.modmenu_version}") {
+		transitive = false
+	}
+
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+processResources {
+	def version = project.version
+	def minecraftRange = project.minecraft_range
+	inputs.property "version", version
+	inputs.property "minecraftRange", minecraftRange
+
+	filesMatching(["fabric.mod.json", "quilt.mod.json"]) {
+		expand "version": version, "minecraftRange": minecraftRange
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+test {
+	useJUnitPlatform()
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName" }
+	}
+}

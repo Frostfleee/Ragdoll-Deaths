@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "com.frostfleee.ragdolldeaths.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"GhostExtractionMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

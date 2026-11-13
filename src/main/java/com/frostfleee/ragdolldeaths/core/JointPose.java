@@ -258,6 +258,17 @@ public final class JointPose {
 		return value;
 	}
 
+	/**
+	 * Roughly where this frame puts the joint on one axis, in the outward-positive convention: the blended target
+	 * (taken as 0 where the model's own value is kept) plus every offset. Used to judge which way gravity pulls.
+	 */
+	public double approximate(JointRole role, Side side, int axis) {
+		int slot = slot(role, side);
+		double targetValue = target[slot * 3 + axis];
+		double value = (Double.isNaN(targetValue) ? 0.0 : targetValue * blend[slot]) + add[slot * 3 + axis];
+		return side == Side.LEFT && axis != X ? -value : value;
+	}
+
 	private void markCenter(JointRole role, Side side) {
 		if (side == Side.CENTER) {
 			centerSet[role.ordinal()] = true;

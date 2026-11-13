@@ -21,6 +21,20 @@ sourceSets {
 	}
 }
 
+// ./gradlew runClientGameTest -PvisualTests opens a fresh test world, stages deaths from src/gametest and saves
+// screenshots under build/run/clientGameTest/screenshots. Development only: nothing from it ships in the jar.
+if (project.hasProperty('visualTests')) {
+	fabricApi {
+		configureTests {
+			createSourceSet = true
+			modId = 'ragdolldeaths-visual-tests'
+			enableGameTests = false
+			enableClientGameTests = true
+			eula = true
+		}
+	}
+}
+
 version = "${project.mod_version}+${project.minecraft_range_name}"
 group = project.maven_group
 

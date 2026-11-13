@@ -13,6 +13,8 @@ abstract class EntityRenderStateMixin implements RagdollRenderData.Holder {
 	private RagdollPose ragdolldeaths$pose;
 	@Unique
 	private JointPose ragdolldeaths$joints;
+	@Unique
+	private Object ragdolldeaths$physics;
 
 	@Override
 	public RagdollPose ragdolldeaths$pose() {
@@ -28,5 +30,15 @@ abstract class EntityRenderStateMixin implements RagdollRenderData.Holder {
 	public void ragdolldeaths$set(RagdollPose pose, JointPose joints) {
 		ragdolldeaths$pose = pose;
 		ragdolldeaths$joints = joints;
+	}
+
+	@Override
+	public Object ragdolldeaths$physics() {
+		return ragdolldeaths$physics;
+	}
+
+	@Override
+	public void ragdolldeaths$setPhysics(Object ragdoll) {
+		ragdolldeaths$physics = ragdoll;
 	}
 }

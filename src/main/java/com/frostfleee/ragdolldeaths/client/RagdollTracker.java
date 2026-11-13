@@ -22,6 +22,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Shulker;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.phys.AABB;
 
 public final class RagdollTracker {
 	public static final RagdollTracker INSTANCE = new RagdollTracker();
@@ -72,7 +73,8 @@ public final class RagdollTracker {
 			return false;
 		}
 		RagdollConfig config = ConfigStore.get();
-		if (ghosts.size() < config.maxActiveRagdolls && RagdollAnimator.needsGhost(ragdoll.profile, config, ragdoll.age(tick, 0.0F))) {
+		// A physics body always outlives the entity; an animated one only when its animation is not over yet.
+		if (ragdoll.isPhysical() || ghosts.size() < config.maxActiveRagdolls && RagdollAnimator.needsGhost(ragdoll.profile, config, ragdoll.age(tick, 0.0F))) {
 			ragdoll.keepAsGhost();
 		}
 		return true;
@@ -89,6 +91,8 @@ public final class RagdollTracker {
 			ghosts.put(ragdoll.entity, ragdoll);
 		} else if (entity.isRemoved() && ragdoll.entity.isDeadOrDying()) {
 			ragdoll.vanish();
+		} else {
+			ragdoll.discard();
 		}
 	}
 
@@ -99,21 +103,58 @@ public final class RagdollTracker {
 		}
 		tick++;
 		RagdollConfig config = ConfigStore.get();
+		deathCamera(config);
 
-		active.values().removeIf(ragdoll -> ragdoll.entity.isRemoved() || !ragdoll.entity.isDeadOrDying() || ragdoll.age(tick, 0.0F) > STALE_AFTER_TICKS);
+		active.values().removeIf(ragdoll -> {
+			boolean gone = ragdoll.entity.isRemoved() || !ragdoll.entity.isDeadOrDying() || ragdoll.age(tick, 0.0F) > STALE_AFTER_TICKS;
+			if (gone) {
+				ragdoll.discard();
+			}
+			return gone;
+		});
 		for (ActiveRagdoll ragdoll : active.values()) {
-			ragdoll.checkKnockedOff(tick);
+			ragdoll.driveMuscles(tick, config);
+		}
+		for (ActiveRagdoll ghost : ghosts.values()) {
+			ghost.driveMuscles(tick, config);
+		}
+		PhysicsHost.INSTANCE.tick();
+		for (ActiveRagdoll ragdoll : active.values()) {
+			ragdoll.checkKnockedOff(tick, config);
+			ragdoll.step(tick, config);
 			if (ragdoll.isFinished(config, tick)) {
 				ragdoll.vanish();
 			}
 		}
 		ghosts.values().removeIf(ghost -> {
+			ghost.step(tick, config);
 			if (!ghost.isFinished(config, tick)) {
 				return false;
 			}
 			ghost.vanish();
 			return true;
 		});
+	}
+
+	private net.minecraft.client.CameraType viewBeforeDeath;
+
+	/**
+	 * The death camera: while you are dead the view is third person, so your own body is drawn and you watch it
+	 * fall; it goes back to how you had it when you respawn.
+	 */
+	private void deathCamera(RagdollConfig config) {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.player == null) {
+			return;
+		}
+		boolean dead = minecraft.player.isDeadOrDying();
+		if (dead && viewBeforeDeath == null && config.deathCamera && config.enabled && config.playerRagdolls) {
+			viewBeforeDeath = minecraft.options.getCameraType();
+			minecraft.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);
+		} else if (!dead && viewBeforeDeath != null) {
+			minecraft.options.setCameraType(viewBeforeDeath);
+			viewBeforeDeath = null;
+		}
 	}
 
 	/** Adds the ghost bodies to the frame being extracted; each loader calls this at the end of level extraction. */
@@ -140,9 +181,49 @@ public final class RagdollTracker {
 		}
 	}
 
+	/** The box a living entity's ragdoll is culled by while it is being animated, or null to use its hitbox. */
+	public AABB renderBounds(LivingEntity entity) {
+		ActiveRagdoll ragdoll = active.get(entity.getId());
+		return ragdoll == null || ragdoll.entity != entity ? null : ragdoll.renderBounds();
+	}
+
 	public void clear() {
 		active.clear();
 		ghosts.clear();
+		PhysicsHost.INSTANCE.clear();
+		RecentExplosions.clear();
+	}
+
+	/**
+	 * For the visual test: one line per physics body saying whether it has come to rest and whether any part's
+	 * centre is inside a block.
+	 */
+	public java.util.List<String> physicsReport() {
+		java.util.List<String> lines = new java.util.ArrayList<>();
+		for (PhysicsRagdoll ragdoll : PhysicsHost.INSTANCE.ragdolls()) {
+			var torso = ragdoll.bodies[ragdoll.torso];
+			lines.add(String.format(java.util.Locale.ROOT, "%s parts=%d asleep=%b speed=%.3f inside=%d failed=%b thrown=%.1f blocks torso y %+.2f v=(%.1f %.1f %.1f) at (%.1f %.1f %.1f) (%s)",
+					EntityFilter.idOf(ragdoll.entity.getType()), ragdoll.bodies.length, ragdoll.island.asleep, ragdoll.maxSpeed(), ragdoll.partsInsideBlocks(),
+					ragdoll.failed, Math.hypot(torso.x - ragdoll.startX, torso.z - ragdoll.startZ), torso.y - ragdoll.startY, torso.vx, torso.vy, torso.vz, torso.x, torso.y, torso.z, ragdoll.blow) + ragdoll.insideReport() + (ragdoll.special != null ? ragdoll.shapeReport() : ""));
+		}
+		return lines;
+	}
+
+	/** Makes room for one more physics body by letting the oldest one go. */
+	private void makeRoomForBody(RagdollConfig config) {
+		while (PhysicsHost.INSTANCE.count() >= config.maxBodies) {
+			ActiveRagdoll oldest = null;
+			for (ActiveRagdoll ghost : ghosts.values()) {
+				if (ghost.isPhysical() && (oldest == null || ghost.startTick() < oldest.startTick())) {
+					oldest = ghost;
+				}
+			}
+			if (oldest == null) {
+				return;
+			}
+			oldest.vanish();
+			ghosts.remove(oldest.entity);
+		}
 	}
 
 	private ActiveRagdoll find(LivingEntity entity) {
@@ -165,8 +246,11 @@ public final class RagdollTracker {
 		if (failedTypes.contains(entity.getType()) || !EntityFilter.isEligible(entity, config)) {
 			return null;
 		}
-		ActiveRagdoll ragdoll = new ActiveRagdoll(entity, ProfileFactory.create((LivingEntityRenderer<?, ?, ?>) renderer, entity, config), tick);
+		ActiveRagdoll ragdoll = new ActiveRagdoll(entity, ProfileFactory.create((LivingEntityRenderer<?, ?, ?>) renderer, entity, config), tick, config);
 		active.put(entity.getId(), ragdoll);
+		if (ragdoll.isPhysical()) {
+			makeRoomForBody(config);
+		}
 		if (ragdoll.profile.kind() == BodyKind.SHULKER && entity instanceof Shulker shulker) {
 			breakShell(shulker);
 		}
@@ -180,9 +264,16 @@ public final class RagdollTracker {
 	}
 
 	private void fail(LivingEntity entity, EntityRenderState state, RuntimeException error) {
-		active.remove(entity.getId());
-		ghosts.remove(entity);
+		ActiveRagdoll dropped = active.remove(entity.getId());
+		if (dropped != null) {
+			dropped.discard();
+		}
+		dropped = ghosts.remove(entity);
+		if (dropped != null) {
+			dropped.discard();
+		}
 		RagdollRenderData.set(state, null, null);
+		RagdollRenderData.setPhysics(state, null);
 		markFailed(entity.getType(), error);
 	}
 

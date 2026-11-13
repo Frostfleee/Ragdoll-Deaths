@@ -19,27 +19,33 @@ final class JointRig {
 	/**
 	 * {@code groundY} is the ground's height in the part's parent space; {@code length} is how far the part's cubes
 	 * reach below its pivot and {@code minZ} how far they reach toward its front, both in model pixels.
+	 * {@code pivotX, pivotY, pivotZ} is the joint's resting pivot in the model's root space and {@code top} how far
+	 * its cubes reach above the pivot (a head's), in model pixels.
 	 */
-	record Joint(ModelPart part, JointRole role, Side side, int index, float outwardX, float outwardZ, float groundY, float length, float minZ) {
+	record Joint(ModelPart part, JointRole role, Side side, int index, float outwardX, float outwardZ, float groundY, float length, float minZ,
+			float pivotX, float pivotY, float pivotZ, float top) {
 	}
 
 	private static final Map<ModelPart, JointRig> CACHE = new WeakHashMap<>();
 	private static final float PIVOT_EPSILON = 1.0E-3F;
 	private static final float MODEL_GROUND_Y = 24.0F;
 
-	static final JointRig EMPTY = new JointRig(List.of(), Rig.OTHER, DeathProfile.DEFAULT_LEG_RATIO, Double.NaN);
+	static final JointRig EMPTY = new JointRig(List.of(), Rig.OTHER, DeathProfile.DEFAULT_LEG_RATIO, Double.NaN, 0.0F);
 
 	final List<Joint> joints;
 	final Rig rig;
 	final double legRatio;
 	/** Half the torso's side-to-side width as a fraction of model height, or NaN when the model has no body part. */
 	final double bodyHalfWidthRatio;
+	/** The model's height in model pixels, from its lowest cube to its highest. */
+	final float modelHeight;
 
-	private JointRig(List<Joint> joints, Rig rig, double legRatio, double bodyHalfWidthRatio) {
+	private JointRig(List<Joint> joints, Rig rig, double legRatio, double bodyHalfWidthRatio, float modelHeight) {
 		this.joints = joints;
 		this.rig = rig;
 		this.legRatio = legRatio;
 		this.bodyHalfWidthRatio = bodyHalfWidthRatio;
+		this.modelHeight = modelHeight;
 	}
 
 	static JointRig of(ModelPart root) {
@@ -53,12 +59,12 @@ final class JointRig {
 	private static JointRig build(ModelPart root) {
 		List<Joint> joints = new ArrayList<>();
 		Map<JointRole, Integer> counts = new EnumMap<>(JointRole.class);
-		collect(root, joints, counts, null, 0.0F);
+		collect(root, joints, counts, null, 0.0F, 0.0F, 0.0F);
 		float height = modelHeight(root);
-		return new JointRig(List.copyOf(joints), classify(joints), legRatio(joints, height), bodyHalfWidthRatio(joints, height));
+		return new JointRig(List.copyOf(joints), classify(joints), legRatio(joints, height), bodyHalfWidthRatio(joints, height), height);
 	}
 
-	private static void collect(ModelPart parent, List<Joint> joints, Map<JointRole, Integer> counts, JointRole container, float parentY) {
+	private static void collect(ModelPart parent, List<Joint> joints, Map<JointRole, Integer> counts, JointRole container, float parentX, float parentY, float parentZ) {
 		Map<String, ModelPart> children = ((ModelPartAccessor) (Object) parent).ragdolldeaths$children();
 		List<Joint> assignedHere = new ArrayList<>();
 		List<ModelPart> unassigned = new ArrayList<>();
@@ -66,16 +72,18 @@ final class JointRig {
 		children.forEach((name, part) -> {
 			String[] tokens = JointNames.tokens(name);
 			JointRole role = JointNames.roleOf(tokens);
+			float childX = parentX + part.getInitialPose().x();
 			float childY = parentY + part.getInitialPose().y();
+			float childZ = parentZ + part.getInitialPose().z();
 			if (role == null || !allowedInside(container, role)) {
 				unassigned.add(part);
-				collect(part, joints, counts, container, childY);
+				collect(part, joints, counts, container, childX, childY, childZ);
 				return;
 			}
-			Joint joint = joint(part, role, JointNames.sideOf(tokens), counts, MODEL_GROUND_Y - parentY);
+			Joint joint = joint(part, role, JointNames.sideOf(tokens), counts, MODEL_GROUND_Y - parentY, childX, childY, childZ);
 			joints.add(joint);
 			assignedHere.add(joint);
-			collect(part, joints, counts, role == JointRole.BODY ? container : role, childY);
+			collect(part, joints, counts, role == JointRole.BODY ? container : role, childX, childY, childZ);
 		});
 
 		if (container == null) {
@@ -104,32 +112,35 @@ final class JointRig {
 				PartPose other = joint.part().getInitialPose();
 				if (joint.role() != JointRole.EYE && samePivot(pose, other) && sameRotation(pose, other)) {
 					float[] reach = reach(part);
-					joints.add(new Joint(part, joint.role(), joint.side(), joint.index(), joint.outwardX(), joint.outwardZ(), joint.groundY(), reach[0], reach[1]));
+					joints.add(new Joint(part, joint.role(), joint.side(), joint.index(), joint.outwardX(), joint.outwardZ(), joint.groundY(), reach[0], reach[1],
+							joint.pivotX(), joint.pivotY(), joint.pivotZ(), reach[2]));
 					break;
 				}
 			}
 		}
 	}
 
-	private static Joint joint(ModelPart part, JointRole role, Side side, Map<JointRole, Integer> counts, float groundY) {
+	private static Joint joint(ModelPart part, JointRole role, Side side, Map<JointRole, Integer> counts, float groundY, float pivotX, float pivotY, float pivotZ) {
 		int index = counts.merge(role, 1, Integer::sum) - 1;
 		PartPose pose = part.getInitialPose();
 		float length = (float) Math.hypot(pose.x(), pose.z());
 		float outwardX = length > PIVOT_EPSILON ? pose.x() / length : 0.0F;
 		float outwardZ = length > PIVOT_EPSILON ? pose.z() / length : 1.0F;
 		float[] reach = reach(part);
-		return new Joint(part, role, side, index, outwardX, outwardZ, groundY, reach[0], reach[1]);
+		return new Joint(part, role, side, index, outwardX, outwardZ, groundY, reach[0], reach[1], pivotX, pivotY, pivotZ, reach[2]);
 	}
 
-	/** How far the part's own cubes reach below its pivot and toward its front. */
+	/** How far the part's own cubes reach below its pivot, toward its front and above its pivot. */
 	private static float[] reach(ModelPart part) {
 		float below = 0.0F;
 		float front = 0.0F;
+		float above = 0.0F;
 		for (ModelPart.Cube cube : ((ModelPartAccessor) (Object) part).ragdolldeaths$cubes()) {
 			below = Math.max(below, cube.maxY);
 			front = Math.min(front, cube.minZ);
+			above = Math.max(above, -cube.minY);
 		}
-		return new float[] {below, front};
+		return new float[] {below, front, above};
 	}
 
 	private static Rig classify(List<Joint> joints) {

@@ -15,8 +15,11 @@ public final class RagdollConfig {
 	public static final int MIN_LIFETIME_TICKS = 4;
 	public static final int MAX_LIFETIME_TICKS = 60;
 	public static final int DEFAULT_LIFETIME_TICKS = 30;
+	public static final int DEFAULT_GHOST_TICKS = 60;
 	public static final int MAX_GHOST_TICKS = 100;
 	public static final int MAX_WARDEN_EXTRA_TICKS = 60;
+	public static final int DEFAULT_BODY_LIFETIME_TICKS = 100;
+	public static final int MAX_BODY_LIFETIME_TICKS = 1200;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
@@ -36,15 +39,46 @@ public final class RagdollConfig {
 	public WaterBehavior waterBehavior = WaterBehavior.FLOAT;
 	public boolean lavaSink = true;
 	public boolean fallImpact = true;
+	public boolean throwRiders = true;
 
 	public int wardenExtraTicks = 20;
 
-	public int ghostMaxTicks = 60;
+	public int ghostMaxTicks = DEFAULT_GHOST_TICKS;
+
+	/** Real physics bodies. Off brings back the animation-only deaths, for weak computers. */
+	public boolean physicsRagdolls = true;
+	/** How long a physics body lies there before it vanishes, in ticks. */
+	public int bodyLifetimeTicks = DEFAULT_BODY_LIFETIME_TICKS;
+	/**
+	 * Beta, off by default: cuts arms and legs in two so they bend at a knee or an elbow. Bodies crumple more
+	 * convincingly, at the cost of ten parts a body instead of six and limbs that are no longer vanilla's one piece.
+	 */
+	public boolean kneesAndElbows = false;
+	/** How long a dying body's muscles keep pulling before it is completely limp, in seconds. Zero is limp at once. */
+	public double muscleSeconds = 1.5;
+	/** Skeletons come apart at the joints when hit or landing hard. Off, they fall in one piece like other mobs. */
+	public boolean skeletonsBreak = true;
+	/** How much of the physics is worked out: Low is lighter on the computer, High is steadier in crowded piles. */
+	public enum Quality {
+		LOW, MEDIUM, HIGH
+	}
+
+	public Quality physicsQuality = Quality.MEDIUM;
+	/** How hard explosions throw bodies. */
+	public double explosionStrength = 1.0;
+	/** The thud of a body hitting a block, a splash in water, the clatter of loose bones. */
+	public boolean impactSounds = true;
+	/** A puff of the block's dust on a hard landing, drops of water on a splash. */
+	public boolean impactParticles = true;
+	/** When you die, the view switches to third person so you see your own body fall; it switches back when you respawn. */
+	public boolean deathCamera = false;
+	/** Arms thrown out in a forward fall, chin tucked in a backward one. */
+	public boolean reflexes = true;
+	/** The most physics bodies at once; the oldest goes when another one is needed. */
+	public int maxBodies = 48;
 	public List<String> excludedEntities = new ArrayList<>();
-	public List<String> ghostEntities = new ArrayList<>(List.of("minecraft:ghast", "minecraft:happy_ghast"));
 
 	private transient Set<String> excludedLookup = Set.of();
-	private transient Set<String> ghostLookup = Set.of();
 
 	public static RagdollConfig defaults() {
 		return new RagdollConfig().sanitize();
@@ -74,22 +108,23 @@ public final class RagdollConfig {
 		bounceStrength = finiteOr(bounceStrength, defaults.bounceStrength, 0.0, 2.0);
 		wardenExtraTicks = Math.clamp(wardenExtraTicks, 0, MAX_WARDEN_EXTRA_TICKS);
 		ghostMaxTicks = Math.clamp(ghostMaxTicks, Math.max(VANILLA_DEATH_TICKS, lifetimeTicks), MAX_GHOST_TICKS);
+		bodyLifetimeTicks = Math.clamp(bodyLifetimeTicks, VANILLA_DEATH_TICKS, MAX_BODY_LIFETIME_TICKS);
+		maxBodies = Math.clamp(maxBodies, 1, 256);
+		muscleSeconds = finiteOr(muscleSeconds, defaults.muscleSeconds, 0.0, 5.0);
+		explosionStrength = finiteOr(explosionStrength, defaults.explosionStrength, 0.0, 2.0);
+		if (physicsQuality == null) {
+			physicsQuality = defaults.physicsQuality;
+		}
 		if (waterBehavior == null) {
 			waterBehavior = defaults.waterBehavior;
 		}
 		excludedEntities = cleanIds(excludedEntities, List.of());
-		ghostEntities = cleanIds(ghostEntities, defaults.ghostEntities);
 		excludedLookup = Set.copyOf(excludedEntities);
-		ghostLookup = Set.copyOf(ghostEntities);
 		return this;
 	}
 
 	public boolean isExcluded(String entityId) {
 		return excludedLookup.contains(entityId);
-	}
-
-	public boolean usesGhost(String entityId) {
-		return ghostLookup.contains(entityId);
 	}
 
 	public static List<String> splitIds(String text) {

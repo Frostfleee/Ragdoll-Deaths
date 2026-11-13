@@ -8,6 +8,9 @@ plugins {
 def src = rootDir.toPath().resolve('../src').normalize().toFile()
 def compat = project.compat
 
+// Build outside OneDrive, whose sync locks files under build/ mid-build.
+layout.buildDirectory = file("${System.getenv('LOCALAPPDATA')}/ragdolldeaths-build/neoforge")
+
 version = project.mod_version
 base {
 	archivesName = 'ragdoll-deaths-neoforge'

@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "ragdolldeaths-visual-tests",
+	"version": "1.0.0",
+	"name": "Ragdoll Deaths visual tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"com.frostfleee.ragdolldeaths.visualtest.RagdollVisualTest"
+		]
+	},
+	"depends": {
+		"ragdolldeaths": "*"
+	}
+}

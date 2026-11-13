@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds every release jar: one per loader and game-version group, into
-# dist/<Loader>/Ragdoll Deaths v<version> - <Loader> <versions>.jar.
+# <Desktop>/Ragdoll Deaths/<Loader>/Ragdoll Deaths v<version> - <Loader> <versions>.jar.
 # A whole patch line is labelled like 26.1.x; a span across minor versions like 26.2-26.3.
 #
 # A group shares one jar when the mod compiles to identical bytecode against each version in it and every mixin
@@ -11,10 +11,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 VERSION=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
-OUT=${1:-dist}
+OUT=${1:-"$(powershell.exe -NoProfile -Command "[Environment]::GetFolderPath('Desktop')" | tr -d '\r')/Ragdoll Deaths"}
 mkdir -p "$OUT"
+# The NeoForge and Forge builds write outside OneDrive (see their build.gradle).
+EXTERNAL="$(cygpath -u "$LOCALAPPDATA")/ragdolldeaths-build"
 
-# Synced or indexed folders can briefly lock files under build/; retry when that is the only failure.
+# OneDrive sometimes locks files under build/; retry when that is the only failure.
 gradle() {
 	for attempt in 1 2 3 4 5; do
 		if ./gradlew "$@" > build-all.log 2>&1; then
@@ -42,15 +44,15 @@ fabric_like() { # fabric_like <fabric|quilt> <Loader name> <label> <mc> <compat>
 }
 
 neoforge() { # neoforge <label> <mc> <compat> <neoforge> <range>
-	rm -rf neoforge/build/libs
+	rm -rf "$EXTERNAL/neoforge/libs"
 	gradle -p neoforge build "-Pminecraft_version=$2" "-Pcompat=$3" "-Pneo_version=$4" "-Pminecraft_range=$5"
-	ship neoforge/build/libs/*.jar NeoForge "$1"
+	ship "$EXTERNAL"/neoforge/libs/*.jar NeoForge "$1"
 }
 
 forge() { # forge <label> <compat> <forge> <mc range> <forge range>
-	rm -rf forge/build/libs
+	rm -rf "$EXTERNAL/forge/libs"
 	gradle -p forge build "-Pcompat=$2" "-Pforge_version=$3" "-Pminecraft_range=$4" "-Pforge_range=$5"
-	ship forge/build/libs/*.jar Forge "$1"
+	ship "$EXTERNAL"/forge/libs/*.jar Forge "$1"
 }
 
 echo "Building Ragdoll Deaths $VERSION into $OUT"

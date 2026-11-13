@@ -15,6 +15,9 @@ public final class RagdollTransforms {
 
 	public static void apply(RagdollPose pose, PoseStack poseStack) {
 		poseStack.translate(pose.offsetX, pose.offsetY, pose.offsetZ);
+		if (pose.slopeAngle != 0.0) {
+			poseStack.mulPose(MATRIX.rotation(ROTATION.rotationAxis((float) pose.slopeAngle, (float) pose.slopeAxisX, 0.0F, (float) pose.slopeAxisZ)));
+		}
 		float pivot = (float) pose.pivotY;
 		poseStack.translate(0.0F, pivot, 0.0F);
 		if (pose.spinAngle != 0.0) {

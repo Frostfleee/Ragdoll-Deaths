@@ -27,10 +27,21 @@ final class EntityFilter {
 		if (entity instanceof Player && !config.playerRagdolls) {
 			return false;
 		}
-		if (entity.isPassenger() || entity.isSleeping() || config.isExcluded(idOf(entity.getType()))) {
+		if (entity.isSleeping() || config.isExcluded(idOf(entity.getType()))) {
+			return false;
+		}
+		if (entity.isPassenger() && !(config.throwRiders && isMountedRider(entity))) {
 			return false;
 		}
 		return withinRenderDistance(entity.position(), config);
+	}
+
+	/**
+	 * Riding a mob (a horse, a spider, a chicken, a ravager) and above any water or lava, so the body can be thrown
+	 * off. Boats, minecarts and other non-living vehicles keep the vanilla death.
+	 */
+	static boolean isMountedRider(LivingEntity entity) {
+		return entity.getVehicle() instanceof LivingEntity && !entity.isInWater() && !entity.isInLava();
 	}
 
 	static boolean withinRenderDistance(Vec3 position, RagdollConfig config) {

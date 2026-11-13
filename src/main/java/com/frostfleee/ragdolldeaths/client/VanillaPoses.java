@@ -7,6 +7,8 @@ import net.minecraft.client.renderer.entity.state.FelineRenderState;
 import net.minecraft.client.renderer.entity.state.FoxRenderState;
 import net.minecraft.client.renderer.entity.state.GoatRenderState;
 import net.minecraft.client.renderer.entity.state.GuardianRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.client.renderer.entity.state.IllagerRenderState;
 import net.minecraft.client.renderer.entity.state.NautilusRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.entity.state.PandaRenderState;
@@ -25,6 +27,13 @@ final class VanillaPoses {
 	}
 
 	static void neutralize(LivingEntityRenderState state) {
+		// A rider thrown off its mount drops the sitting pose.
+		if (state instanceof HumanoidRenderState humanoid) {
+			humanoid.isPassenger = false;
+		}
+		if (state instanceof IllagerRenderState illager) {
+			illager.isRiding = false;
+		}
 		switch (state) {
 			case EquineRenderState equine -> {
 				equine.standAnimation = 0.0F;

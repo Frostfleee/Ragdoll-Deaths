@@ -3,6 +3,8 @@
 	"package": "com.frostfleee.ragdolldeaths.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"ClientPacketListenerMixin",
+		"EntityRenderDispatcherMixin",
 		"EntityRendererMixin",
 		"EntityRenderStateMixin",
 		"LivingEntityMixin",

@@ -53,6 +53,23 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				slider("maxActiveRagdolls", 4, 256, c.maxActiveRagdolls, v -> Component.literal(Integer.toString(v)), v -> c.maxActiveRagdolls = v),
 				toggle("hideDeathTint", c.hideDeathTint, v -> c.hideDeathTint = v));
 
+		list.addHeader(header("physics"));
+		list.addSmall(
+				toggle("physicsRagdolls", c.physicsRagdolls, v -> c.physicsRagdolls = v),
+				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
+				quality(c),
+				slider("maxBodies", 4, 128, c.maxBodies, v -> Component.literal(Integer.toString(v)), v -> c.maxBodies = v),
+				percent("explosionStrength", 0, 200, c.explosionStrength, v -> c.explosionStrength = v),
+				slider("muscleSeconds", 0, 50, (int) Math.round(c.muscleSeconds * 10.0),
+						v -> Component.translatable(KEY + "wholeSeconds", String.format(Locale.ROOT, "%.1f", v / 10.0)), v -> c.muscleSeconds = v / 10.0),
+				toggle("reflexes", c.reflexes, v -> c.reflexes = v),
+				toggle("skeletonsBreak", c.skeletonsBreak, v -> c.skeletonsBreak = v),
+				toggle("impactSounds", c.impactSounds, v -> c.impactSounds = v),
+				toggle("impactParticles", c.impactParticles, v -> c.impactParticles = v),
+				toggle("deathCamera", c.deathCamera, v -> c.deathCamera = v),
+				slider("bodyLifetimeTicks", 1, RagdollConfig.MAX_BODY_LIFETIME_TICKS / 20, c.bodyLifetimeTicks / 20,
+						v -> Component.translatable(KEY + "wholeSeconds", v), v -> c.bodyLifetimeTicks = v * 20));
+
 		list.addHeader(header("motion"));
 		list.addSmall(
 				percent("hitReactionStrength", 0, 200, c.hitReactionStrength, v -> c.hitReactionStrength = v),
@@ -64,12 +81,11 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 		list.addSmall(
 				waterBehavior(c),
 				toggle("lavaSink", c.lavaSink, v -> c.lavaSink = v),
-				toggle("fallImpact", c.fallImpact, v -> c.fallImpact = v));
+				toggle("fallImpact", c.fallImpact, v -> c.fallImpact = v),
+				toggle("throwRiders", c.throwRiders, v -> c.throwRiders = v));
 
 		list.addHeader(header("excludedEntities"));
 		Compat.addWide(list, idList("excludedEntities", c.excludedEntities, ids -> c.excludedEntities = ids));
-		list.addHeader(header("ghostEntities"));
-		Compat.addWide(list, idList("ghostEntities", c.ghostEntities, ids -> c.ghostEntities = ids));
 	}
 
 	@Override
@@ -110,6 +126,18 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 
 	private static OptionInstance<Integer> percent(String name, int min, int max, double value, DoubleConsumer setter) {
 		return slider(name, min, max, (int) Math.round(value * 100.0), v -> Component.literal(v + "%"), v -> setter.accept(v / 100.0));
+	}
+
+	private static OptionInstance<RagdollConfig.Quality> quality(RagdollConfig c) {
+		List<RagdollConfig.Quality> values = List.of(RagdollConfig.Quality.values());
+		return new OptionInstance<>(
+				KEY + "physicsQuality",
+				tooltip("physicsQuality"),
+				// The cycle button puts the caption in front itself: only the value here.
+				(caption, v) -> Component.translatable(KEY + "physicsQuality." + v.name().toLowerCase(Locale.ROOT)),
+				new OptionInstance.Enum<>(values, Codec.STRING.xmap(RagdollConfig.Quality::valueOf, RagdollConfig.Quality::name)),
+				c.physicsQuality,
+				v -> c.physicsQuality = v);
 	}
 
 	private static OptionInstance<WaterBehavior> waterBehavior(RagdollConfig c) {

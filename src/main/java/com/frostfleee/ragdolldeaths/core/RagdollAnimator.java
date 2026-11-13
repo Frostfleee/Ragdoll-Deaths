@@ -26,6 +26,18 @@ public final class RagdollAnimator {
 	private static final double FREE_FALL_DRAG = 0.09;
 	private static final double FALLING_POSE_BLEND_TICKS = 3.0;
 
+	/** A blasted body slides to a stop this fast once it lands, in 1/ticks. */
+	private static final double BLAST_GROUND_FRICTION = 0.5;
+	/** How strongly a blasted body's limbs trail while it flies, compared with a plain fall. */
+	private static final double BLAST_TRAIL = 0.7;
+
+	/** A body on uneven ground tilts by at most this much, up a rise or down a drop. */
+	private static final double MAX_SLOPE_UP = Math.toRadians(40.0);
+	private static final double MAX_SLOPE_DOWN = Math.toRadians(30.0);
+	private static final double MIN_SLOPE = Math.toRadians(2.0);
+	/** Ticks a landed body takes to settle into the slope it landed on. */
+	private static final double SLOPE_SETTLE_TICKS = 4.0;
+
 	/** A body in water speeds up as it floats up or sinks, to a steady speed, in blocks per tick. */
 	private static final double WATER_ACCELERATION = 0.006;
 	private static final double WATER_RISE_SPEED = 0.1;
@@ -41,10 +53,20 @@ public final class RagdollAnimator {
 		if (profile.kind() == BodyKind.SHULKER) {
 			return 0.0;
 		}
+		if (lands(profile)) {
+			return simulatedEnd(profile, config);
+		}
 		if (profile.freeFall()) {
 			double land = landTick(profile, config);
 			double rest = config.lifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
 			return land >= config.ghostMaxTicks ? config.ghostMaxTicks : land / config.animationSpeed + rest;
+		}
+		if (profile.blasted()) {
+			// The death plays while it flies, so it needs only about half its usual rest once it has landed.
+			double land = landTick(profile, config);
+			double end = config.lifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
+			return land >= config.ghostMaxTicks ? config.ghostMaxTicks
+					: Math.min(config.ghostMaxTicks, Math.max(end, land / config.animationSpeed + config.lifetimeTicks * 0.5));
 		}
 		if (profile.ghostCapable()) {
 			double landing = landTick(profile, config) / config.animationSpeed + GHAST_SETTLE_TICKS;
@@ -93,16 +115,51 @@ public final class RagdollAnimator {
 		return profile.kind() == BodyKind.AQUATIC ? WaterBehavior.FLOAT : configured;
 	}
 
+	/**
+	 * A simulated body that falls, flies or is thrown, and so has a landing; a body that died in water is also
+	 * simulated, but only drifts with the current.
+	 */
+	static boolean lands(DeathProfile profile) {
+		return profile.simulated() && (profile.kind().airborne() || profile.freeFall() || profile.blasted());
+	}
+
+	/**
+	 * A simulated body stays until it has landed and rested, however long the fall takes, up to its fall limit
+	 * (over the void it vanishes in the air at that limit).
+	 */
+	private static double simulatedEnd(DeathProfile profile, RagdollConfig config) {
+		if (!profile.hasLanded()) {
+			return profile.fallLimit();
+		}
+		double land = profile.landedAt() / config.animationSpeed;
+		if (profile.landedIn() == DeathCause.LAVA) {
+			return land + LAVA_SUBMERGE_TICKS + 1;
+		}
+		double rest = config.lifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
+		if (profile.blasted()) {
+			// The death plays while it flies, so it needs only about half its usual rest once it has landed.
+			return Math.max(rest, land + config.lifetimeTicks * 0.5);
+		}
+		if (profile.kind().airborne()) {
+			return Math.max(config.lifetimeTicks, land + (profile.kind() == BodyKind.GHAST ? GHAST_SETTLE_TICKS : config.lifetimeTicks * 0.5));
+		}
+		return land + rest;
+	}
+
 	public static boolean needsGhost(DeathProfile profile, RagdollConfig config, double ageTicks) {
 		return endTick(profile, config) > ageTicks + 1.0;
 	}
 
 	/** First tick at which an airborne body touches its floor, or the ghost limit if it never does. */
 	public static double landTick(DeathProfile profile, RagdollConfig config) {
-		if (!profile.kind().airborne() && !profile.freeFall()) {
+		if (lands(profile)) {
+			return profile.hasLanded() ? profile.landedAt() : Double.POSITIVE_INFINITY;
+		}
+		if (!profile.followsTrajectory()) {
 			return 0.0;
 		}
-		for (int tick = 0; tick <= config.ghostMaxTicks; tick++) {
+		// A blasted body starts on the floor it is thrown from, so it can only land from the next tick on.
+		for (int tick = profile.blasted() ? 1 : 0; tick <= config.ghostMaxTicks; tick++) {
 			if (verticalTravel(profile, tick) <= profile.floorDrop()) {
 				return tick;
 			}
@@ -126,9 +183,12 @@ public final class RagdollAnimator {
 		}
 		if (profile.freeFall()) {
 			freeFall(profile, config, t, pose, joints);
+		} else if (profile.blasted()) {
+			blast(profile, config, t, pose, joints);
 		} else {
 			animateBody(profile, config, effectiveCause(profile, config), t, pose, joints);
 		}
+		fitToGround(profile, config, t, pose);
 		if (!config.legKicks) {
 			for (JointRole leg : new JointRole[] {JointRole.LEG, JointRole.FRONT_LEG, JointRole.HIND_LEG, JointRole.MID_LEG}) {
 				joints.twitch(leg, 0.0, 0.0, 0.0, 0.0);
@@ -147,22 +207,130 @@ public final class RagdollAnimator {
 		if (t < land) {
 			fallingPose(joints, Motion.smooth(t, 0.0, 6.0));
 		} else {
-			DeathCause landing = config.fallImpact ? DeathCause.FALL : DeathCause.GROUND;
-			animateBody(profile, config, landing, t - land, pose, joints);
+			animateBody(profile, config, landingCause(profile, config), t - land, pose, joints);
 			fallingPose(joints, 1.0 - Motion.smooth(t - land, 0.0, FALLING_POSE_BLEND_TICKS));
 		}
+		if (profile.simulated()) {
+			return;
+		}
 
-		double carry = carry(t, FREE_FALL_DRAG);
-		double travelX = profile.velocityX() * carry;
-		double travelZ = profile.velocityZ() * carry;
+		double[] path = trajectory(profile, config, t);
+		pose.offsetX += path[0];
+		pose.offsetY += path[1];
+		pose.offsetZ += path[2];
+	}
+
+	/** A body landing in water rolls over and floats, in lava it sinks; on the ground it takes the fall impact. */
+	private static DeathCause landingCause(DeathProfile profile, RagdollConfig config) {
+		if (profile.simulated() && profile.landedIn() == DeathCause.WATER) {
+			return DeathCause.WATER;
+		}
+		if (profile.simulated() && profile.landedIn() == DeathCause.LAVA) {
+			return config.lavaSink ? DeathCause.LAVA : DeathCause.GROUND;
+		}
+		return config.fallImpact ? DeathCause.FALL : DeathCause.GROUND;
+	}
+
+	/**
+	 * A body launched by an explosion flies in an arc, playing its normal death (away from the blast) on the way
+	 * with its limbs trailing, then lands with a bounce and slides to a stop. Walls stop it via {@code maxPush}.
+	 */
+	private static void blast(DeathProfile profile, RagdollConfig config, double t, RagdollPose pose, JointPose joints) {
+		double land = landTick(profile, config);
+		animateBody(profile, config, DeathCause.GROUND, t, pose, joints);
+		fallingPose(joints, BLAST_TRAIL * Motion.smooth(t, 0.0, 3.0) * (1.0 - Motion.smooth(t, land, land + FALLING_POSE_BLEND_TICKS)));
+		if (profile.simulated()) {
+			// The flight, the bounce and the slide come from the body's own motion through the world.
+			return;
+		}
+
+		double[] path = trajectory(profile, config, t);
+		double totalX = pose.offsetX + path[0];
+		double totalZ = pose.offsetZ + path[2];
+		double total = Math.hypot(totalX, totalZ);
+		if (total > profile.maxPush() && total > 0.0) {
+			totalX *= profile.maxPush() / total;
+			totalZ *= profile.maxPush() / total;
+		}
+		pose.offsetX = totalX;
+		pose.offsetZ = totalZ;
+		pose.offsetY += path[1] + impactBounceHeight(profile, config, t, land);
+	}
+
+	/**
+	 * Where a falling or blasted body has travelled to at choreography time {@code t}, relative to where it died:
+	 * x, y and z in blocks. It never goes below {@code floorDrop} or further sideways than {@code maxPush}.
+	 * Bodies that don't follow such a path stay at zero.
+	 */
+	public static double[] trajectory(DeathProfile profile, RagdollConfig config, double t) {
+		if (!profile.freeFall() && !profile.blasted()) {
+			return new double[3];
+		}
+		double carried;
+		double y;
+		if (profile.blasted()) {
+			double land = landTick(profile, config);
+			double flight = Math.min(t, land);
+			double slide = t > land ? Math.exp(-FREE_FALL_DRAG * land) * (1.0 - Math.exp(-BLAST_GROUND_FRICTION * (t - land))) / BLAST_GROUND_FRICTION : 0.0;
+			carried = carry(flight, FREE_FALL_DRAG) + slide;
+			y = t < land ? Math.max(profile.floorDrop(), verticalTravel(profile, t)) : profile.floorDrop();
+		} else {
+			carried = carry(t, FREE_FALL_DRAG);
+			y = Math.max(profile.floorDrop(), verticalTravel(profile, t));
+		}
+		double travelX = profile.velocityX() * carried;
+		double travelZ = profile.velocityZ() * carried;
 		double travel = Math.hypot(travelX, travelZ);
 		if (travel > profile.maxPush() && travel > 0.0) {
 			travelX *= profile.maxPush() / travel;
 			travelZ *= profile.maxPush() / travel;
 		}
-		pose.offsetX += travelX;
-		pose.offsetZ += travelZ;
-		pose.offsetY += Math.max(profile.floorDrop(), verticalTravel(profile, t));
+		return new double[] {travelX, y, travelZ};
+	}
+
+	/**
+	 * Tilts a body that has toppled over so it rests on the ground around it, measured where it settled: up a
+	 * stair, a slab or a hillside it falls against, or down over a step. The tilt grows as the body tips over,
+	 * so an upright body is unaffected, and a body that has just landed eases into it.
+	 */
+	private static void fitToGround(DeathProfile profile, RagdollConfig config, double t, RagdollPose pose) {
+		Ground ground = profile.ground();
+		if (ground.flat() || profile.kind().airborne() || profile.kind() == BodyKind.SHULKER) {
+			return;
+		}
+		DeathCause cause = effectiveCause(profile, config);
+		boolean landsLater = profile.freeFall() || profile.blasted();
+		if (!landsLater && (cause == DeathCause.WATER || cause == DeathCause.LAVA)) {
+			return;
+		}
+		if (profile.simulated() && profile.landedIn() != DeathCause.GROUND) {
+			return;
+		}
+		double settle = 1.0;
+		if (profile.followsTrajectory()) {
+			double land = landTick(profile, config);
+			if (t < land) {
+				return;
+			}
+			settle = Motion.smooth(t, land, land + SLOPE_SETTLE_TICKS);
+		}
+
+		double reach = 0.6 * profile.height();
+		double[] top = pose.toWorld(0.0, reach, 0.0);
+		double dirX = top[0] - pose.offsetX;
+		double dirZ = top[2] - pose.offsetZ;
+		double lean = Math.hypot(dirX, dirZ);
+		if (lean < 0.05 * reach) {
+			return;
+		}
+		double angle = Math.clamp(Math.atan2(ground.riseToward(dirX, dirZ), ground.radius()), -MAX_SLOPE_DOWN, MAX_SLOPE_UP);
+		if (Math.abs(angle) < MIN_SLOPE) {
+			return;
+		}
+		// Rotating about (-z, 0, x) lifts the side of the body that lies toward (x, z).
+		pose.slopeAxisX = -dirZ / lean;
+		pose.slopeAxisZ = dirX / lean;
+		pose.slopeAngle = angle * Math.min(1.0, lean / reach) * settle;
 	}
 
 	/** Limbs trailing upward in the rushing air; {@code weight} blends it in while falling and out after landing. */
@@ -379,6 +547,9 @@ public final class RagdollAnimator {
 	}
 
 	private static void airborneTravel(DeathProfile profile, double age, double drag, RagdollPose pose) {
+		if (profile.simulated()) {
+			return;
+		}
 		double carry = carry(age, drag);
 		double travelX = profile.velocityX() * carry;
 		double travelZ = profile.velocityZ() * carry;
@@ -394,7 +565,7 @@ public final class RagdollAnimator {
 	}
 
 	static double verticalTravel(DeathProfile profile, double age) {
-		if (profile.freeFall()) {
+		if (profile.freeFall() || profile.blasted()) {
 			return profile.velocityY() * carry(age, FREE_FALL_DRAG) - terminalFall(age, FREE_FALL_GRAVITY, FREE_FALL_TERMINAL);
 		}
 		return switch (profile.kind()) {

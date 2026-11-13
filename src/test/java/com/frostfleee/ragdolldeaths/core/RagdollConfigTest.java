@@ -21,8 +21,6 @@ class RagdollConfigTest {
 		assertTrue(config.fallImpact);
 		assertEquals(1.0, config.hitReactionStrength);
 		assertEquals(60, config.ghostMaxTicks);
-		assertTrue(config.usesGhost("minecraft:ghast"));
-		assertTrue(config.usesGhost("minecraft:happy_ghast"));
 		assertFalse(config.isExcluded("minecraft:zombie"));
 	}
 
@@ -31,7 +29,15 @@ class RagdollConfigTest {
 		RagdollConfig config = RagdollConfig.parse("{\"playerRagdolls\": false}");
 		assertFalse(config.playerRagdolls);
 		assertEquals(30, config.lifetimeTicks);
-		assertEquals(List.of("minecraft:ghast", "minecraft:happy_ghast"), config.ghostEntities);
+		assertTrue(config.excludedEntities.isEmpty());
+	}
+
+	@Test
+	void settingsFromOlderVersionsAreIgnored() {
+		RagdollConfig config = RagdollConfig.parse("{\"ghostEntities\": [\"phantom\"], \"explosionLaunch\": false, \"lavaSink\": false}");
+		assertFalse(config.lavaSink);
+		assertFalse(config.toJson().contains("ghostEntities"));
+		assertFalse(config.toJson().contains("explosionLaunch"));
 	}
 
 	@Test
@@ -90,19 +96,15 @@ class RagdollConfigTest {
 	@Test
 	void entityIdsAreNormalized() {
 		RagdollConfig config = RagdollConfig.parse("""
-				{"excludedEntities": [" Zombie ", "somemod:Big_Worm", "", null, "zombie"],
-				 "ghostEntities": ["phantom"]}
+				{"excludedEntities": [" Zombie ", "mod_name:Mob_Name", "", null, "zombie"]}
 				""");
-		assertEquals(List.of("minecraft:zombie", "somemod:big_worm"), config.excludedEntities);
-		assertTrue(config.isExcluded("somemod:big_worm"));
-		assertTrue(config.usesGhost("minecraft:phantom"));
-		assertFalse(config.usesGhost("minecraft:ghast"));
+		assertEquals(List.of("minecraft:zombie", "mod_name:mob_name"), config.excludedEntities);
+		assertTrue(config.isExcluded("mod_name:mob_name"));
 	}
 
 	@Test
 	void nullListsRestoreDefaults() {
-		RagdollConfig config = RagdollConfig.parse("{\"ghostEntities\": null, \"excludedEntities\": null}");
-		assertTrue(config.usesGhost("minecraft:ghast"));
+		RagdollConfig config = RagdollConfig.parse("{\"excludedEntities\": null}");
 		assertTrue(config.excludedEntities.isEmpty());
 	}
 

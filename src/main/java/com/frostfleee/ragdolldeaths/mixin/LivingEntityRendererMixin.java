@@ -1,6 +1,7 @@
 package com.frostfleee.ragdolldeaths.mixin;
 
 import com.frostfleee.ragdolldeaths.client.JointApplier;
+import com.frostfleee.ragdolldeaths.client.PhysicsPoseApplier;
 import com.frostfleee.ragdolldeaths.client.RagdollRenderData;
 import com.frostfleee.ragdolldeaths.client.RagdollTransforms;
 import com.frostfleee.ragdolldeaths.core.RagdollPose;
@@ -37,13 +38,34 @@ abstract class LivingEntityRendererMixin {
 		if (pose != null) {
 			RagdollTransforms.apply(pose, poseStack);
 		}
+		PhysicsPoseApplier.begin((LivingEntityRenderer<?, ?, ?>) (Object) this, state, camera);
 	}
 
 	@Inject(
 			method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/EntityModel;setupAnim(Ljava/lang/Object;)V", shift = At.Shift.AFTER))
 	private void ragdolldeaths$poseLayerJoints(LivingEntityRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera, CallbackInfo ci) {
-		JointApplier.apply(((LivingEntityRenderer<?, ?, ?>) (Object) this).getModel(), state);
+		// Layers that hang things on the model (held items, heads) read its parts right after this.
+		var model = ((LivingEntityRenderer<?, ?, ?>) (Object) this).getModel();
+		if (!PhysicsPoseApplier.apply(model, state, poseStack.last().pose())) {
+			JointApplier.apply(model, state);
+		}
+	}
+
+	// A body burnt by lava is drawn with its own copy of the mob's texture, with the burnt pixels on it.
+	@ModifyExpressionValue(
+			method = "getRenderType",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/LivingEntityRenderer;getTextureLocation(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;)Lnet/minecraft/resources/Identifier;"))
+	private net.minecraft.resources.Identifier ragdolldeaths$scorched(net.minecraft.resources.Identifier texture, @Local(argsOnly = true) LivingEntityRenderState state) {
+		return RagdollRenderData.texture(state, texture);
+	}
+
+	// A body that has been in lava is drawn burnt: its own colours are multiplied down to almost black.
+	@ModifyExpressionValue(
+			method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/LivingEntityRenderer;getModelTint(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;)I"))
+	private int ragdolldeaths$charred(int tint, @Local(argsOnly = true) LivingEntityRenderState state) {
+		return RagdollRenderData.charred(state) ? 0xFF1A1716 : tint;
 	}
 
 	@ModifyExpressionValue(

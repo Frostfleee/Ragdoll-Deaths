@@ -30,7 +30,13 @@ public record DeathProfile(
 		double attachZ,
 		boolean ghostCapable,
 		boolean freeFall,
+		boolean blasted,
 		boolean calmWings,
+		Ground ground,
+		boolean simulated,
+		double landedAt,
+		DeathCause landedIn,
+		double fallLimit,
 		long seed) {
 
 	public static final double DEFAULT_LEG_RATIO = 0.4;
@@ -38,11 +44,48 @@ public record DeathProfile(
 	private static final double HEAVY_MASS_START = 1.5;
 	private static final double HEAVY_MASS_RANGE = 4.5;
 
-	/** The same body, switched to falling from where it is now, e.g. after the killing blow knocked it off a ledge. */
+	/**
+	 * The same body, switched to falling from where it is now, e.g. after the killing blow knocked it off a ledge.
+	 * It is simulated from here on, and the ground it was going to lie on no longer applies.
+	 */
 	public DeathProfile asFreeFall(double floorDrop, double velocityX, double velocityY, double velocityZ, double maxPush) {
 		return new DeathProfile(kind, special, rig, legRatio, cause, hit, fallDirX, fallDirZ, forwardX, forwardZ, width, height,
 				bodyHalfWidth, heaviness, baby, flipsOnBack, alreadySideways, velocityX, velocityY, velocityZ, Math.max(0.0, maxPush),
-				Math.min(0.0, floorDrop), waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, true, calmWings, seed);
+				Math.min(0.0, floorDrop), waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, true, false, calmWings, Ground.FLAT, true, Double.NaN, DeathCause.GROUND, fallLimit, seed);
+	}
+
+	/** The same body with the shape of the ground it rests on, measured where it settled. */
+	public DeathProfile withGround(Ground ground) {
+		return new DeathProfile(kind, special, rig, legRatio, cause, hit, fallDirX, fallDirZ, forwardX, forwardZ, width, height,
+				bodyHalfWidth, heaviness, baby, flipsOnBack, alreadySideways, velocityX, velocityY, velocityZ, maxPush,
+				floorDrop, waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, freeFall, blasted, calmWings,
+				ground == null ? Ground.FLAT : ground, simulated, landedAt, landedIn, fallLimit, seed);
+	}
+
+	/** The same body after it first touched the ground or a fluid, at choreography time {@code landedAt}. */
+	public DeathProfile withLanding(double landedAt, DeathCause landedIn) {
+		return new DeathProfile(kind, special, rig, legRatio, cause, hit, fallDirX, fallDirZ, forwardX, forwardZ, width, height,
+				bodyHalfWidth, heaviness, baby, flipsOnBack, alreadySideways, velocityX, velocityY, velocityZ, maxPush,
+				floorDrop, waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, freeFall, blasted, calmWings, ground,
+				simulated, landedAt, landedIn, fallLimit, seed);
+	}
+
+	/** The same body allowed to keep falling for up to {@code fallLimit} ticks before it vanishes in the air. */
+	public DeathProfile withFallLimit(double fallLimit) {
+		return new DeathProfile(kind, special, rig, legRatio, cause, hit, fallDirX, fallDirZ, forwardX, forwardZ, width, height,
+				bodyHalfWidth, heaviness, baby, flipsOnBack, alreadySideways, velocityX, velocityY, velocityZ, maxPush,
+				floorDrop, waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, freeFall, blasted, calmWings, ground,
+				simulated, landedAt, landedIn, fallLimit, seed);
+	}
+
+	/** The body follows its own path from the death position instead of the synced entity position. */
+	public boolean followsTrajectory() {
+		return kind.airborne() || freeFall || blasted || simulated;
+	}
+
+	/** A simulated body that has touched the ground or a fluid. */
+	public boolean hasLanded() {
+		return !Double.isNaN(landedAt);
 	}
 
 	public double legLength() {
@@ -85,7 +128,11 @@ public record DeathProfile(
 		private double attachZ;
 		private boolean ghostCapable;
 		private boolean freeFall;
+		private boolean blasted;
 		private boolean calmWings;
+		private Ground ground = Ground.FLAT;
+		private boolean simulated;
+		private double fallLimit = RagdollConfig.DEFAULT_GHOST_TICKS;
 		private long seed;
 
 		private Builder(BodyKind kind) {
@@ -182,6 +229,34 @@ public record DeathProfile(
 			return this;
 		}
 
+		/**
+		 * The body was launched by an explosion with {@link #velocity}: it flies in an arc above {@link #floorDrop},
+		 * playing its death on the way, and lands with a bounce and a short slide.
+		 */
+		public Builder blasted(boolean blasted) {
+			this.blasted = blasted;
+			return this;
+		}
+
+		/**
+		 * The body's position comes from a {@link BodyMotion} stepped through the world, not from the precomputed
+		 * paths; its landing is reported with {@link DeathProfile#withLanding}.
+		 */
+		public Builder simulated(boolean simulated) {
+			this.simulated = simulated;
+			return this;
+		}
+
+		public Builder fallLimit(double fallLimit) {
+			this.fallLimit = fallLimit;
+			return this;
+		}
+
+		public Builder ground(Ground ground) {
+			this.ground = ground == null ? Ground.FLAT : ground;
+			return this;
+		}
+
 		/** Wings settle to rest and go still instead of fluttering. */
 		public Builder calmWings(boolean calmWings) {
 			this.calmWings = calmWings;
@@ -199,7 +274,7 @@ public record DeathProfile(
 			return new DeathProfile(kind, special, rig, legRatio, cause, hit, fall[0], fall[1], -Math.sin(yaw), Math.cos(yaw), width, height,
 					bodyHalfWidth > 0.0 ? bodyHalfWidth : Double.NaN,
 					heavinessOf(width, height), baby, flipsOnBack, alreadySideways, velocityX, velocityY, velocityZ,
-					Math.max(0.0, maxPush), floorDrop, waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, freeFall, calmWings, seed);
+					Math.max(0.0, maxPush), floorDrop, waterRise, waterSink, attachX, attachY, attachZ, ghostCapable, freeFall, blasted, calmWings, ground, simulated, Double.NaN, DeathCause.GROUND, fallLimit, seed);
 		}
 	}
 }

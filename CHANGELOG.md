@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.1
+
+### New
+- **Minecraft 1.21 to 1.21.11.** Every loader now also runs on 1.21 to 1.21.11, with the same physics bodies (Forge from 1.21.3 for the 1.21.2-1.21.4 group, as there is no Forge for 1.21.2). Pick the jar for your version group: 1.21-1.21.1, 1.21.2-1.21.4, 1.21.5-1.21.8, 1.21.9-1.21.10 or 1.21.11. Forge splits two of them further, as its own event bus changed in 1.21.6: 1.21.3-1.21.4, 1.21.5 and 1.21.6-1.21.8.
+- **Death camera follows your body.** While you are dead, the view follows your own body's head and slowly circles it, keeping out of walls, instead of staying third person where you died.
+- **Player Body Until Respawn** (setting, on by default). A player's body stays where it fell until that player respawns, instead of going after the body lifetime.
+
+  ![The death camera following your body, which stays until you respawn](https://cdn.modrinth.com/data/1eTrUOwY/images/7223d04675607fa8f82eefbea9fdbf4110129b65.gif)
+
+- **Shulkers are physics bodies.** The killing blow knocks the shell over and it tumbles as the full box it is; when its time is up it breaks like a shulker box of its color, with the box's breaking sound.
+- **New icon.** A zombie lying on open grass, with soft shadows.
+
+### Fixed
+- Your own body was thrown about three times too far by the killing blow: the knockback was counted twice.
+- Your own body could vanish a moment after you died, while you were still on the death screen: a dead player is removed differently from a dying mob, and their body was not kept.
+- The Quilt jars did not load on Quilt: they did not say they use Fabric's mappings, and Quilt read their Minecraft version range as a single bound.
+- On Forge, a loading-error screen came up at startup and the mod's own resources (its settings text and icon) were left out: the jar had no pack.mcmeta.
+
 ## 1.1.0
 
 Dead mobs are now real physics bodies instead of playing a fixed animation.

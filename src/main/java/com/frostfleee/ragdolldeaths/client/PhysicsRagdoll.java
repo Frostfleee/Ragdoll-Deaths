@@ -10,7 +10,6 @@ import java.util.Map;
 import com.frostfleee.ragdolldeaths.core.JointRole;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
@@ -43,7 +42,7 @@ final class PhysicsRagdoll {
 	 * @param splitY where the part is cut into two halves (its own Y, in pixels) when it is a limb with a knee or
 	 *               an elbow, else NaN
 	 */
-	record Link(String[] path, int body, Matrix4f offset, PartPose rest, float splitY, boolean hidden) {
+	record Link(String[] path, int body, Matrix4f offset, Rest rest, float splitY, boolean hidden) {
 	}
 
 	/** A link found in one particular model. */
@@ -52,7 +51,7 @@ final class PhysicsRagdoll {
 
 	final LivingEntity entity;
 	/** The mob's own model (not an armor or other layer model), noted each frame before anything is drawn. */
-	Model<?> mainModel;
+	Model mainModel;
 	/** The camera the current frame's matrices are relative to. */
 	double camX, camY, camZ;
 	/** How far into the current tick the frame being drawn is. */
@@ -99,7 +98,7 @@ final class PhysicsRagdoll {
 	/** The body has touched lava. */
 	boolean charred;
 	/** The texture the mob is drawn with, noted each frame, and this body's own burnt copy of it once it has one. */
-	net.minecraft.resources.Identifier baseTexture;
+	Object baseTexture;
 	Scorch scorch;
 	private boolean scorchFailed;
 
@@ -253,6 +252,22 @@ final class PhysicsRagdoll {
 		return new Vec3(at[0], at[1], at[2]);
 	}
 
+	/** Where the head is on the frame being drawn, or the torso for a body without one. */
+	Vec3 headPosition(float partialTicks) {
+		int head = torso;
+		for (int i = 0; i < roles.length; i++) {
+			if (roles[i] == JointRole.HEAD) {
+				head = i;
+				break;
+			}
+		}
+		float keep = alpha;
+		alpha = partialTicks;
+		interpolate(head);
+		alpha = keep;
+		return new Vec3(at[0], at[1], at[2]);
+	}
+
 	/** A box around every part, for culling. */
 	AABB bounds() {
 		double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, minZ = Double.MAX_VALUE;
@@ -274,8 +289,8 @@ final class PhysicsRagdoll {
 	 *
 	 * @param pose the matrix the model is about to be drawn with: model space to camera-relative world space
 	 */
-	void write(Model<?> model, Matrix4f pose) {
-		ModelPart root = model.root();
+	void write(Model model, Matrix4f pose) {
+		ModelPart root = Compat.root(model);
 		Binding[] bound = bindings.get(root);
 		if (bound == null) {
 			bound = bind(root);
@@ -357,9 +372,9 @@ final class PhysicsRagdoll {
 				}
 			}
 			Matrix4f correction = null;
-			if (!sameRest(part.getInitialPose(), link.rest())) {
+			if (!sameRest(Rest.of(part), link.rest())) {
 				correction = ModelMath.mul(new Matrix4f(), link.rest()).invertAffine();
-				ModelMath.mul(correction, part.getInitialPose());
+				ModelMath.mul(correction, Rest.of(part));
 			}
 			found.add(new Binding(part, link, correction, parent, between.toArray(ModelPart[]::new), split));
 			paths.add(link.path());
@@ -376,7 +391,7 @@ final class PhysicsRagdoll {
 		return true;
 	}
 
-	private static boolean sameRest(PartPose a, PartPose b) {
+	private static boolean sameRest(Rest a, Rest b) {
 		return Math.abs(a.x() - b.x()) + Math.abs(a.y() - b.y()) + Math.abs(a.z() - b.z()) < 1.0E-3F
 				&& Math.abs(a.xRot() - b.xRot()) + Math.abs(a.yRot() - b.yRot()) + Math.abs(a.zRot() - b.zRot()) < 1.0E-3F
 				&& Math.abs(a.xScale() - b.xScale()) + Math.abs(a.yScale() - b.yScale()) + Math.abs(a.zScale() - b.zScale()) < 1.0E-3F;

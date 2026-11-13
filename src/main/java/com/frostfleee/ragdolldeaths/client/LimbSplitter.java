@@ -139,11 +139,11 @@ final class LimbSplitter {
 	private static boolean halve(ModelPart.Cube cube, float plane, float pivotX, float pivotZ, List<ModelPart.Cube> upper, List<ModelPart.Cube> lower) {
 		List<ModelPart.Polygon> up = new ArrayList<>();
 		List<ModelPart.Polygon> low = new ArrayList<>();
-		for (ModelPart.Polygon polygon : cube.polygons) {
+		for (ModelPart.Polygon polygon : Compat.polygons(cube)) {
 			float min = Float.MAX_VALUE, max = -Float.MAX_VALUE;
-			for (ModelPart.Vertex vertex : polygon.vertices()) {
-				min = Math.min(min, vertex.y());
-				max = Math.max(max, vertex.y());
+			for (ModelPart.Vertex vertex : Compat.vertices(polygon)) {
+				min = Math.min(min, Compat.vy(vertex));
+				max = Math.max(max, Compat.vy(vertex));
 			}
 			if (max <= plane + EDGE) {
 				up.add(polygon);
@@ -192,28 +192,28 @@ final class LimbSplitter {
 		}
 		ModelPart.Cube cube = new ModelPart.Cube(0, 0, minX - offsetX, minY - offsetY, minZ - offsetZ, maxX - minX, maxY - minY, maxZ - minZ,
 				0.0F, 0.0F, 0.0F, false, 64.0F, 64.0F, sides);
-		if (cube.polygons.length != faces.size()) {
+		if (Compat.polygons(cube).length != faces.size()) {
 			return null;
 		}
 		for (int i = 0; i < faces.size(); i++) {
 			ModelPart.Polygon face = faces.get(i);
-			ModelPart.Vertex[] moved = new ModelPart.Vertex[face.vertices().length];
+			ModelPart.Vertex[] moved = new ModelPart.Vertex[Compat.vertices(face).length];
 			for (int k = 0; k < moved.length; k++) {
-				ModelPart.Vertex v = face.vertices()[k];
-				moved[k] = new ModelPart.Vertex(v.x() - offsetX, v.y() - offsetY, v.z() - offsetZ, v.u(), v.v());
+				ModelPart.Vertex v = Compat.vertices(face)[k];
+				moved[k] = Compat.vertex(Compat.vx(v) - offsetX, Compat.vy(v) - offsetY, Compat.vz(v) - offsetZ, Compat.vu(v), Compat.vv(v));
 			}
-			cube.polygons[i] = new ModelPart.Polygon(moved, face.normal());
+			Compat.polygons(cube)[i] = Compat.newPolygon(moved, Compat.normal(face));
 		}
 		return cube;
 	}
 
 	/** The part of a side face above the plane (smaller Y) or below it, with the texture cut at the same place. */
 	private static ModelPart.Polygon clip(ModelPart.Polygon polygon, float plane, boolean keepAbove) {
-		ModelPart.Vertex[] from = polygon.vertices();
+		ModelPart.Vertex[] from = Compat.vertices(polygon);
 		ModelPart.Vertex[] to = new ModelPart.Vertex[from.length];
 		for (int i = 0; i < from.length; i++) {
 			ModelPart.Vertex v = from[i];
-			boolean kept = keepAbove ? v.y() <= plane : v.y() >= plane;
+			boolean kept = keepAbove ? Compat.vy(v) <= plane : Compat.vy(v) >= plane;
 			if (kept) {
 				to[i] = v;
 				continue;
@@ -223,8 +223,8 @@ final class LimbSplitter {
 			ModelPart.Vertex partner = null;
 			float nearest = Float.MAX_VALUE;
 			for (ModelPart.Vertex other : from) {
-				boolean otherKept = keepAbove ? other.y() <= plane : other.y() >= plane;
-				float distance = Math.abs(other.x() - v.x()) + Math.abs(other.z() - v.z());
+				boolean otherKept = keepAbove ? Compat.vy(other) <= plane : Compat.vy(other) >= plane;
+				float distance = Math.abs(Compat.vx(other) - Compat.vx(v)) + Math.abs(Compat.vz(other) - Compat.vz(v));
 				if (otherKept && distance < nearest) {
 					nearest = distance;
 					partner = other;
@@ -234,19 +234,19 @@ final class LimbSplitter {
 				to[i] = v;
 				continue;
 			}
-			float f = (plane - v.y()) / (partner.y() - v.y());
-			to[i] = new ModelPart.Vertex(v.x() + (partner.x() - v.x()) * f, plane, v.z() + (partner.z() - v.z()) * f,
-					v.u() + (partner.u() - v.u()) * f, v.v() + (partner.v() - v.v()) * f);
+			float f = (plane - Compat.vy(v)) / (Compat.vy(partner) - Compat.vy(v));
+			to[i] = Compat.vertex(Compat.vx(v) + (Compat.vx(partner) - Compat.vx(v)) * f, plane, Compat.vz(v) + (Compat.vz(partner) - Compat.vz(v)) * f,
+					Compat.vu(v) + (Compat.vu(partner) - Compat.vu(v)) * f, Compat.vv(v) + (Compat.vv(partner) - Compat.vv(v)) * f);
 		}
-		return new ModelPart.Polygon(to, polygon.normal());
+		return Compat.newPolygon(to, Compat.normal(polygon));
 	}
 
 	private static ModelPart.Polygon flatten(ModelPart.Polygon polygon, float y) {
-		ModelPart.Vertex[] from = polygon.vertices();
+		ModelPart.Vertex[] from = Compat.vertices(polygon);
 		ModelPart.Vertex[] to = new ModelPart.Vertex[from.length];
 		for (int i = 0; i < from.length; i++) {
-			to[i] = new ModelPart.Vertex(from[i].x(), y, from[i].z(), from[i].u(), from[i].v());
+			to[i] = Compat.vertex(Compat.vx(from[i]), y, Compat.vz(from[i]), Compat.vu(from[i]), Compat.vv(from[i]));
 		}
-		return new ModelPart.Polygon(to, polygon.normal());
+		return Compat.newPolygon(to, Compat.normal(polygon));
 	}
 }

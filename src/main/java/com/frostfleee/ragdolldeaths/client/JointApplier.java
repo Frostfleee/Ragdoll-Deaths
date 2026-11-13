@@ -4,7 +4,6 @@ import com.frostfleee.ragdolldeaths.core.JointPose;
 import com.frostfleee.ragdolldeaths.core.JointRole;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.util.Mth;
 
@@ -12,7 +11,7 @@ public final class JointApplier {
 	private JointApplier() {
 	}
 
-	public static void apply(Model<?> model, Object state) {
+	public static void apply(Model model, Object state) {
 		if (!(state instanceof EntityRenderState renderState)) {
 			return;
 		}
@@ -21,7 +20,7 @@ public final class JointApplier {
 			return;
 		}
 
-		ModelPart root = model.root();
+		ModelPart root = Compat.root(model);
 		try {
 			for (JointRig.Joint joint : JointRig.of(root).joints) {
 				pose(joint, joints);
@@ -99,7 +98,7 @@ public final class JointApplier {
 		if (weight <= 0.0F) {
 			return;
 		}
-		PartPose rest = part.getInitialPose();
+		Rest rest = Rest.of(part);
 		part.x = Mth.lerp(weight, part.x, rest.x());
 		part.y = Mth.lerp(weight, part.y, rest.y());
 		part.z = Mth.lerp(weight, part.z, rest.z());

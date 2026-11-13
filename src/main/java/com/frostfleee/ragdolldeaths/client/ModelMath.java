@@ -1,7 +1,6 @@
 package com.frostfleee.ragdolldeaths.client;
 
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -23,7 +22,7 @@ final class ModelMath {
 		return m;
 	}
 
-	static Matrix4f mul(Matrix4f m, PartPose pose) {
+	static Matrix4f mul(Matrix4f m, Rest pose) {
 		m.translate(pose.x() / 16.0F, pose.y() / 16.0F, pose.z() / 16.0F);
 		if (pose.xRot() != 0.0F || pose.yRot() != 0.0F || pose.zRot() != 0.0F) {
 			m.rotateZYX(pose.zRot(), pose.yRot(), pose.xRot());

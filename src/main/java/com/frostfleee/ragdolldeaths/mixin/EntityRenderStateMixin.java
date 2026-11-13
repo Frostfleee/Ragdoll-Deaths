@@ -15,6 +15,18 @@ abstract class EntityRenderStateMixin implements RagdollRenderData.Holder {
 	private JointPose ragdolldeaths$joints;
 	@Unique
 	private Object ragdolldeaths$physics;
+	@Unique
+	private int ragdolldeaths$light = -1;
+
+	@Override
+	public int ragdolldeaths$light() {
+		return ragdolldeaths$light;
+	}
+
+	@Override
+	public void ragdolldeaths$setLight(int light) {
+		ragdolldeaths$light = light;
+	}
 
 	@Override
 	public RagdollPose ragdolldeaths$pose() {

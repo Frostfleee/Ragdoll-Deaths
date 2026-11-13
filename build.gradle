@@ -33,6 +33,8 @@ if (project.hasProperty('visualTests')) {
 			eula = true
 		}
 	}
+	// The visual test's frame capture differs between game versions.
+	sourceSets.gametest.java.srcDir "src/gametest_${compat}/java"
 }
 
 version = "${project.mod_version}+${project.minecraft_range_name}"
@@ -45,6 +47,13 @@ base {
 repositories {
 	mavenCentral()
 	maven {
+		name = 'Quilt'
+		url = 'https://maven.quiltmc.org/repository/release/'
+		content {
+			includeGroup 'org.quiltmc'
+		}
+	}
+	maven {
 		name = 'TerraformersMC'
 		url = 'https://maven.terraformersmc.com/releases/'
 		content {
@@ -55,7 +64,17 @@ repositories {
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	if (loader == 'quilt' && project.hasProperty('quiltRun')) {
+		// -PquiltRun: runClient starts the game on the Quilt loader itself, which also provides Fabric's loader API.
+		implementation "org.quiltmc:quilt-loader:${project.findProperty('quilt_loader_version') ?: '0.30.2'}"
+		// what Quilt's launcher manifest (quilt-loader-<version>.json) lists; its Maven metadata names none of it
+		implementation 'net.fabricmc:sponge-mixin:0.17.4+mixin.0.8.7'
+		implementation 'io.github.llamalad7:mixinextras-fabric:0.5.5'
+		implementation 'org.quiltmc:quilt-json5:1.0.4+final'
+		implementation 'org.quiltmc:quilt-config:1.3.3'
+	} else {
+		implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	}
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	compileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") {
@@ -75,9 +94,15 @@ processResources {
 	def minecraftRange = project.minecraft_range
 	inputs.property "version", version
 	inputs.property "minecraftRange", minecraftRange
+	// Gradle does not see edits to the filters below: bump this when changing them, so the resources are rebuilt.
+	inputs.property "filterRevision", 2
 
+	// Quilt reads ">=26.2 <26.4" as one bound; it takes the two bounds as {"all": [">=26.2", "<26.4"]}.
+	def quiltMinecraftRange = '{ "all": [' + minecraftRange.split(' ').collect { '"' + it + '"' }.join(', ') + '] }'
 	filesMatching(["fabric.mod.json", "quilt.mod.json"]) {
-		expand "version": version, "minecraftRange": minecraftRange
+		expand "version": version, "minecraftRange": minecraftRange, "quiltMinecraftRange": quiltMinecraftRange
+		// Quilt assumes its own hashed names unless told the mod uses Fabric's (on 26.x, which needs none, as well).
+		filter { it.replace('"group": "com.frostfleee",', '"group": "com.frostfleee", "intermediate_mappings": "net.fabricmc:intermediary",') }
 	}
 }
 
@@ -100,5 +125,23 @@ jar {
 
 	from("LICENSE") {
 		rename { "${it}_$projectName" }
+	}
+}
+
+// -Pselftest makes ./gradlew runClient create a world, kill some mobs and the player, log SELFTEST lines and quit
+// (see SelfTest).
+loom {
+	runs {
+		client {
+			if (project.hasProperty('selftest')) {
+				vmArg '-Dragdolldeaths.selftest=true'
+			}
+			if (project.hasProperty('quiltRun')) {
+				// Quilt reads its own names for Loom's development flags; without them it loads no mods from the classpath.
+				vmArg '-Dloader.development=true'
+				vmArg '-Dloader.disable_forked_guis=true' // a crash ends the run instead of waiting in a window
+				vmArg "-Dloader.remapClasspathFile=${file('.gradle/loom-cache/remapClasspath.txt')}"
+			}
+		}
 	}
 }

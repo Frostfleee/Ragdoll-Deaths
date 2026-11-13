@@ -13,6 +13,8 @@ Every living mob in Minecraft 26.3, grouped by the animation code it uses. Check
 
 **Automatic screenshots.** `./gradlew runClientGameTest -PvisualTests` opens a fresh flat test world by itself, stages a hit up close, a TNT blast, a fall off a ledge, a burning zombie falling 40 blocks and a body in a flowing channel, then closes. Screenshots land in `build/run/clientGameTest/screenshots`. It's a quick first look before the manual checks below.
 
+**Every loader and game version.** `./selftest-all.sh all` starts the game once per release jar group (Fabric, Quilt, NeoForge and Forge, 1.21 to 26.3) with `-Dragdolldeaths.selftest=true`. Each run creates a world, kills eight mobs (zombie, skeleton, creeper, spider, cow, shulker, slime, villager) on a stone stage in the sky and then the player, respawns, takes three screenshots, and prints one line: `PASS` when every mob became a physics body with nothing inside a block, the bodies were drawn, the dead player's body was there and followed by the death camera, it outlasted the body lifetime (Player Body Until Respawn), and it was gone after the respawn. `EDGES=1` adds the oldest version of the groups built against a newer one; `./selftest.sh <loader> <-P...>` runs a single one (see `selftest-all.sh` for the values). Quilt runs start the game on the Quilt loader itself (`-PquiltRun`).
+
 ## Situations
 
 | Code | How to cause it |
@@ -250,6 +252,10 @@ Run the automatic scenes first: `RAGDOLL_SCENES=<names> ./gradlew runClientGameT
 | `plans1` `plans2` `plans3` | Mobs of many different shapes all fall and rest. |
 | `pool` `lavapool` `columns` `water` `charred` | Floats in water and lava, drifts, rises fast over soul sand and slowly over magma, burns where lava touched. |
 | `gear` | Armor and a held sword follow the body; a living mob beside it looks normal. |
+
+Clips for the mod page: `RAGDOLL_SCENES=showcase RAGDOLL_CLIPS=<names>` films them at 50 frames a second of game time (names in `showcase()`). Two of them check 1.1.1: `shulker` (shulkers tumble as full boxes and break like shulker boxes when their time is up) and `death-camera` (you die and the view follows your body's head).
+
+On 1.21.x run the same scenes with the `legacy/` build, for example `./gradlew -p legacy runClientGameTest -PvisualTests -Pminecraft_version=1.21.8 -Pfabric_api_version=0.136.1+1.21.8 -Pmodmenu_version=15.0.0 -Pcompat=mc1_21_5 "-Pminecraft_range=>=1.21.5 <1.21.9"` (the values for each group are in `build-all.sh`). Fabric has no client test API before 1.21.4: on 1.21.2 and 1.21.3, and on NeoForge and Forge everywhere, `runClient` with `-Dmixin.debug.verbose=true` (already set) lists every mixin applied as the game starts.
 
 By hand, check what the scenes cannot: the sounds (thud, splash, bone clatter), your own death with Death Camera on, another player's death, and a crowd (64 zombies and TNT) for stutter.
 

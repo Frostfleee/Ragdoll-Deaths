@@ -12,7 +12,7 @@ import net.minecraft.core.BlockPos;
  * playing: limb physics up close, an explosion, falls (off a ledge and from high up) and a body in flowing water.
  */
 public class RagdollVisualTest implements FabricClientGameTest {
-	private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("ragdolldeaths-visual-test");
+	static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("ragdolldeaths-visual-test");
 	private static final int WIDTH = 960;
 	/** Skeletons burn in the test's daylight unless they wear something on their head. */
 	private static final String HELMET = "equipment:{head:{id:\"minecraft:leather_helmet\"}}";
@@ -57,7 +57,7 @@ public class RagdollVisualTest implements FabricClientGameTest {
 				com.frostfleee.ragdolldeaths.client.ConfigStore.save(config);
 			});
 			// Hides the HUD, so nothing covers the bodies.
-			context.getInput().pressKey(options -> options.keyToggleGui);
+			FrameCapture.hideHud(context);
 
 			// RAGDOLL_SCENES=pillars,blast,... runs only those scenes; by default every scene runs.
 			String only = System.getenv("RAGDOLL_SCENES");
@@ -841,6 +841,8 @@ public class RagdollVisualTest implements FabricClientGameTest {
 	private static void showcase(ClientGameTestContext context, TestSingleplayerContext world, TestServerContext server, int x, int y, int z) {
 		server.runCommand(String.format("forceload add %d %d %d %d", x - 40, z - 40, x + 40, z + 40));
 		server.runCommand("gamerule mob_drops false");
+		// 1.21.x names it differently; on each version one of the two does nothing.
+		server.runCommand("gamerule doMobLoot false");
 		context.runOnClient(client -> client.options.fov().set(40));
 		String only = System.getenv("RAGDOLL_CLIPS");
 		java.util.function.Predicate<String> runs = name -> only == null || only.isBlank() || java.util.Arrays.asList(only.split(",")).contains(name);
@@ -964,6 +966,53 @@ public class RagdollVisualTest implements FabricClientGameTest {
 			film(context, server, "lava-burn", 90, "execute as @e[tag=cast] run data merge entity @s {Motion:[0.0d,0.0d,0.7d]}",
 					"execute as @e[tag=cast] at @s run damage @s 1000 minecraft:mob_attack by @e[tag=hit,sort=nearest,limit=1]");
 		}
+		if (runs.test("shulker")) {
+			// Two shulkers, a purple one on the ground and a red one on a wall: knocked over, they tumble, and when
+			// their time is up they break like shulker boxes. Lifetime is cut to five seconds here so the break is filmed.
+			stage(context, world, server, x, y, z, x + 1.5, y + 3.5, z + 9.0, x + 2.0, y + 0.8, z);
+			server.runCommand(String.format("fill %d %d %d %d %d %d stone_bricks", x + 3, y, z, x + 3, y + 1, z));
+			server.runCommand(String.format("summon shulker %d %d %d {NoAI:1b,Tags:[\"cast\"]}", x - 1, y, z));
+			server.runCommand(String.format("summon shulker %d %d %d {NoAI:1b,Tags:[\"cast\"],Color:14b}", x + 3, y + 2, z));
+			server.runCommand(String.format("summon interaction %d.5 %d %d.5 {width:0f,height:0f,Tags:[\"hit\"]}", x - 5, y + 2, z));
+			context.runOnClient(client -> {
+				com.frostfleee.ragdolldeaths.core.RagdollConfig config = com.frostfleee.ragdolldeaths.client.ConfigStore.get().copy();
+				config.bodyLifetimeTicks = 100;
+				com.frostfleee.ragdolldeaths.client.ConfigStore.save(config);
+			});
+			context.waitTicks(10);
+			film(context, server, "shulker", 125, "execute as @e[tag=cast] at @s run damage @s 1000 minecraft:mob_attack by @e[tag=hit,limit=1]");
+			context.runOnClient(client -> {
+				com.frostfleee.ragdolldeaths.core.RagdollConfig config = com.frostfleee.ragdolldeaths.client.ConfigStore.get().copy();
+				config.bodyLifetimeTicks = 600;
+				com.frostfleee.ragdolldeaths.client.ConfigStore.save(config);
+			});
+		}
+		if (runs.test("death-camera")) {
+			// You die: hit from the front by something unseen, and the death camera follows your body.
+			stage(context, world, server, x, y, z, x + 0.5, y + 1.62, z + 0.5, x + 0.5, y + 1.62, z - 5.0);
+			context.runOnClient(client -> {
+				com.frostfleee.ragdolldeaths.core.RagdollConfig config = com.frostfleee.ragdolldeaths.client.ConfigStore.get().copy();
+				config.deathCamera = true;
+				config.playerRagdolls = true;
+				com.frostfleee.ragdolldeaths.client.ConfigStore.save(config);
+			});
+			server.runCommand("gamemode survival @a");
+			server.runCommand("effect clear @a");
+			attacker(server, x + 0.5, y + 1.0, z - 3.0);
+			context.waitTicks(5);
+			film(context, server, "death-camera", 120, "damage @p 100 minecraft:mob_attack by @e[tag=hit,limit=1]");
+			context.runOnClient(client -> {
+				client.player.respawn();
+				com.frostfleee.ragdolldeaths.client.Compat.setScreen(null);
+			});
+			context.waitTicks(20);
+			server.runCommand("gamemode spectator @a");
+			context.runOnClient(client -> {
+				com.frostfleee.ragdolldeaths.core.RagdollConfig config = com.frostfleee.ragdolldeaths.client.ConfigStore.get().copy();
+				config.deathCamera = false;
+				com.frostfleee.ragdolldeaths.client.ConfigStore.save(config);
+			});
+		}
 		context.runOnClient(client -> client.options.fov().set(70));
 	}
 
@@ -1025,40 +1074,15 @@ public class RagdollVisualTest implements FabricClientGameTest {
 			}
 			int last = k;
 			int at = tick;
+			if (!FrameCapture.SUPPORTED) {
+				// This game version has no way to draw a frame between ticks: one frame a tick, taken by the test API,
+				// which itself moves the game on by the tick.
+				context.takeScreenshot(TestScreenshotOptions.of(String.format("9000_%s-%04d", name, first)).disableCounterPrefix().withSize(FILM_WIDTH, FILM_HEIGHT));
+				continue;
+			}
 			context.runOnClient(client -> {
 				for (int f = first; f < last; f++) {
-					float partial = f * 0.4f - at;
-					net.minecraft.client.DeltaTracker delta = new net.minecraft.client.DeltaTracker() {
-						@Override
-						public float getGameTimeDeltaTicks() {
-							return 0.4f;
-						}
-
-						@Override
-						public float getGameTimeDeltaPartialTick(boolean runsNormally) {
-							return partial;
-						}
-
-						@Override
-						public float getRealtimeDeltaTicks() {
-							return 0.4f;
-						}
-					};
-					client.gameRenderer.update(delta);
-					client.gameRenderer.extract(delta, true);
-					client.gameRenderer.render();
-					com.mojang.blaze3d.systems.RenderSystem.getDevice().createCommandEncoder().submit();
-					java.nio.file.Path file = dir.resolve(String.format("9000_%s-%04d.png", name, f));
-					pending.incrementAndGet();
-					net.minecraft.client.Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), image -> {
-						try (image) {
-							image.writeToFile(file);
-						} catch (java.io.IOException e) {
-							LOGGER.error("could not save frame {}", file, e);
-						} finally {
-							pending.decrementAndGet();
-						}
-					});
+					FrameCapture.queue(client, f * 0.4f - at, dir.resolve(String.format("9000_%s-%04d.png", name, f)), pending);
 				}
 			});
 			context.waitTick();

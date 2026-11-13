@@ -3,7 +3,7 @@
 	"id": "ragdolldeaths",
 	"version": "${version}",
 	"name": "Ragdoll Deaths",
-	"description": "Every mob dies with its own jointed death animation that reacts to the killing blow: zombies fall back, horses roll onto their side, skeletons fall apart and blazes drop their rods. Client-side and purely visual.",
+	"description": "Dead mobs become real physics ragdolls, thrown by the blow that killed them: they tumble down stairs, slump against walls, float in water and burn where lava touched them. Client-side and purely visual.",
 	"authors": [
 		"Frostfleee"
 	],

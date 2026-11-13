@@ -7,24 +7,54 @@ plugins {
 // Forge entrypoint. Run it with ./gradlew -p forge build from the project root.
 def src = rootDir.toPath().resolve('../src').normalize().toFile()
 def compat = project.compat
+// Forge 56 (Minecraft 1.21.6) moved to a new event bus, whose events became records in Forge 59 (1.21.9): -Pforge_bus=6
+// builds the client half for the old bus, -Pforge_bus=7class for Forge 56 to 58, and the default for Forge 59 and later.
+def forgeBus = project.findProperty('forge_bus') ?: '7'
 
 // Build outside OneDrive, whose sync locks files under build/ mid-build.
-layout.buildDirectory = file("${System.getenv('LOCALAPPDATA')}/ragdolldeaths-build/forge")
+// -Pbuild_root=<folder> builds somewhere else (the self-test uses a folder outside AppData, see selftest.sh).
+layout.buildDirectory = file("${project.findProperty('build_root') ?: System.getenv('LOCALAPPDATA') + '/ragdolldeaths-build'}/forge")
 
 version = project.mod_version
 base {
 	archivesName = 'ragdoll-deaths-forge'
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+// 26.x runs on Java 25, 1.21.x on Java 21.
+def javaVersion = (project.findProperty('java_version') ?: '25') as int
+java.toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)
 
 sourceSets {
 	main {
 		java {
-			srcDirs = ["$src/main/java", "$src/$compat/java", "$src/forge/java", "$src/forgelike_$compat/java"]
+			srcDirs = ["$src/main/java", "$src/$compat/java", "$src/forge/java", "$src/forge_bus$forgeBus/java", "$src/forgelike_$compat/java"]
 		}
 		resources {
-			srcDirs = ["$src/main/resources", "$src/forge/resources", "$src/forgelike/resources"]
+			srcDirs = ["$src/main/resources", "$src/forge/resources", "$src/forgelike/resources", "$src/forgelike_$compat/resources"]
+		}
+	}
+}
+
+// 1.21 and 1.21.1 need some game classes opened (src/forgelike_mc1_21_0/resources/META-INF/accesstransformer.cfg);
+// Forge reads META-INF/accesstransformer.cfg from the jar by itself.
+def atFile = file("$src/forgelike_$compat/resources/META-INF/accesstransformer.cfg")
+
+// ./gradlew -p forge runClient starts the game with the mod, for checking it loads.
+minecraft {
+	if (atFile.exists()) {
+		accessTransformer.from(atFile)
+	}
+	runs {
+		register('client') {
+			workingDir = layout.buildDirectory.dir('run').get().asFile
+			// From class folders there is no jar manifest to name the mixin configs, so they are passed here;
+			// verbose Mixin logging lists every class the mod changes.
+			args('--mixin.config', 'ragdolldeaths.mixins.json', '--mixin.config', 'ragdolldeaths.ghosts.mixins.json')
+			jvmArgs('-Dmixin.debug.verbose=true')
+			// -Pselftest makes the game create a world, kill some mobs and the player, log SELFTEST lines and quit (see SelfTest).
+			if (project.hasProperty('selftest')) {
+				jvmArgs('-Dragdolldeaths.selftest=true')
+			}
 		}
 	}
 }
@@ -36,27 +66,97 @@ repositories {
 	mavenCentral()
 }
 
+// Forge bundles MixinExtras, which the mixins use, only from Forge 60 (Minecraft 1.21.10). -Pbundle_mixinextras packs
+// MixinExtras's own Forge jar inside the mod jar (META-INF/jarjar), the way Forge loads a library a mod brings.
+def bundleMixinExtras = project.hasProperty('bundle_mixinextras')
+def mixinExtras = 'io.github.llamalad7:mixinextras-forge:0.5.0'
+configurations {
+	bundled {
+		transitive = false
+	}
+}
+
 dependencies {
 	implementation minecraft.dependency("net.minecraftforge:forge:${project.forge_version}")
+	if (bundleMixinExtras) {
+		// The Forge jar keeps MixinExtras itself nested inside; the mod compiles against the plain library.
+		compileOnly 'io.github.llamalad7:mixinextras-common:0.5.0'
+		implementation mixinExtras
+		bundled mixinExtras
+	}
 }
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 }
 
+// Forge loads a mod's own resources (its translations, its icon) as a resource pack, which needs a pack.mcmeta; without
+// one it shows a loading error and leaves them out. The format is the one Forge's own jar uses for that version (Forge
+// does not hold a mod's pack to it); it changed shape in Forge 59 (Minecraft 1.21.9).
+def forgeMajor = (project.forge_version.split('-')[1].tokenize('.')[0]) as int
+def packFormat = forgeMajor <= 52 ? '"pack_format": 48' : forgeMajor <= 54 ? '"pack_format": 61' : forgeMajor == 55 ? '"pack_format": 71'
+		: forgeMajor <= 58 ? '"pack_format": 81' : forgeMajor <= 60 ? '"min_format": 88, "max_format": 88' : forgeMajor == 61 ? '"min_format": [94, 1], "max_format": 94'
+		: forgeMajor <= 64 ? '"min_format": [101, 1], "max_format": 101' : '"min_format": [121, 0], "max_format": 121'
+def packMeta = layout.buildDirectory.file('generated/packmeta/pack.mcmeta')
+def writePackMeta = tasks.register('writePackMeta') {
+	def text = '{\n  "pack": {\n    "description": "Ragdoll Deaths resources",\n    ' + packFormat + '\n  }\n}\n'
+	inputs.property 'text', text
+	outputs.file packMeta
+	doLast {
+		def file = packMeta.get().asFile
+		file.parentFile.mkdirs()
+		file.text = text
+	}
+}
+
 processResources {
 	def props = [version: project.mod_version, minecraftRange: project.minecraft_range, forgeRange: project.forge_range]
 	inputs.properties props
+	from(writePackMeta)
+	// the mixin list depends on the game version; bump filterRevision when editing the filters below
+	inputs.property 'compat', compat
+	inputs.property 'filterRevision', 5
 	filesMatching('META-INF/mods.toml') {
 		expand props
 	}
 	// Forge ships stock Mixin 0.8.7, which knows compatibility levels up to JAVA_21 and rejects JAVA_25.
 	filesMatching('ragdolldeaths.mixins.json') {
 		filter { it.replace('"JAVA_25"', '"JAVA_21"') }
+		// 1.21 and 1.21.1 have no render states: their hooks make the mod's own stand-ins instead (src/mc1_21_0).
+		if (compat == 'mc1_21_0') {
+			filter { it.replace('"EntityRendererMixin",', '"ModelBakeMixin", "ModelRootMixin", "AgeableListModelAccessor", "CubeAccessor", "SlimeSquishMixin",').replace('"LivingEntityRendererAccessor",', '"LivingEntityRendererFlipAccessor",') }
+			filter { it.replace('"EntityRenderStateMixin",', '') }
+		}
 	}
 }
 
 jar {
+	if (bundleMixinExtras) {
+		def bundledFiles = configurations.bundled
+		def metadata = layout.buildDirectory.file('jarjar/metadata.json')
+		from(bundledFiles) {
+			into 'META-INF/jarjar'
+		}
+		from(metadata) {
+			into 'META-INF/jarjar'
+		}
+		doFirst {
+			def file = metadata.get().asFile
+			file.parentFile.mkdirs()
+			def name = bundledFiles.singleFile.name
+			file.text = """{
+  "jars": [
+    {
+      "identifier": { "group": "io.github.llamalad7", "artifact": "mixinextras-forge" },
+      "version": { "range": "[0.5.0,)", "artifactVersion": "0.5.0" },
+      "path": "META-INF/jarjar/${name}",
+      "isObfuscated": false
+    }
+  ]
+}
+"""
+		}
+	}
 	manifest {
 		attributes('MixinConfigs': 'ragdolldeaths.mixins.json,ragdolldeaths.ghosts.mixins.json')
 	}

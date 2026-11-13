@@ -6,7 +6,6 @@ import com.frostfleee.ragdolldeaths.core.DeathProfile;
 import com.frostfleee.ragdolldeaths.core.HitDirection;
 import com.frostfleee.ragdolldeaths.core.RagdollConfig;
 import com.frostfleee.ragdolldeaths.core.Special;
-import com.frostfleee.ragdolldeaths.mixin.LivingEntityRendererAccessor;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -21,20 +20,9 @@ import net.minecraft.world.entity.ai.navigation.WaterBoundPathNavigation;
 import net.minecraft.world.entity.ambient.Bat;
 import net.minecraft.world.entity.animal.armadillo.Armadillo;
 import net.minecraft.world.entity.animal.frog.Frog;
-import net.minecraft.world.entity.animal.golem.SnowGolem;
-import net.minecraft.world.entity.monster.skeleton.AbstractSkeleton;
 import net.minecraft.world.entity.monster.warden.Warden;
-import net.minecraft.world.entity.animal.AgeableWaterCreature;
 import net.minecraft.world.entity.animal.allay.Allay;
 import net.minecraft.world.entity.animal.axolotl.Axolotl;
-import net.minecraft.world.entity.animal.bee.Bee;
-import net.minecraft.world.entity.animal.fish.AbstractFish;
-import net.minecraft.world.entity.animal.fish.WaterAnimal;
-import net.minecraft.world.entity.animal.happyghast.HappyGhast;
-import net.minecraft.world.entity.animal.nautilus.AbstractNautilus;
-import net.minecraft.world.entity.animal.nautilus.ZombieNautilus;
-import net.minecraft.world.entity.animal.parrot.Parrot;
-import net.minecraft.world.entity.animal.turtle.Turtle;
 import net.minecraft.world.entity.monster.Blaze;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Ghast;
@@ -85,9 +73,9 @@ final class ProfileFactory {
 	private ProfileFactory() {
 	}
 
-	static DeathProfile create(LivingEntityRenderer<?, ?, ?> renderer, LivingEntity entity, RagdollConfig config) {
+	static DeathProfile create(LivingEntityRenderer renderer, LivingEntity entity, RagdollConfig config) {
 		BodyKind kind = classify(entity);
-		JointRig rig = JointRig.of(renderer.getModel().root());
+		JointRig rig = JointRig.of(Compat.root(renderer.getModel()));
 		DeathCause cause = causeOf(entity);
 		float bodyYaw = entity.yBodyRot;
 		Vec3 launch = blastLaunch(entity, kind, cause, config);
@@ -106,10 +94,10 @@ final class ProfileFactory {
 				.baby(entity.isBaby())
 				.rig(rig.rig, rig.legRatio)
 				.bodyHalfWidth(rig.bodyHalfWidthRatio * height)
-				.flipsOnBack(((LivingEntityRendererAccessor) renderer).ragdolldeaths$getFlipDegrees() >= BACK_FLIP_DEGREES)
-				.alreadySideways(entity instanceof AbstractFish && !entity.isInWater())
+				.flipsOnBack(Compat.flipDegrees(renderer, entity) >= BACK_FLIP_DEGREES)
+				.alreadySideways(Mobs.isFish(entity) && !entity.isInWater())
 				.ghostCapable(kind == BodyKind.GHAST)
-				.calmWings(!(entity instanceof Bee));
+				.calmWings(!Mobs.isBee(entity));
 
 		Level level = entity.level();
 		Vec3 center = position.add(0.0, height / 2.0, 0.0);
@@ -182,7 +170,7 @@ final class ProfileFactory {
 	}
 
 	static Special specialOf(LivingEntity entity) {
-		if (entity instanceof SnowGolem) {
+		if (Mobs.isSnowGolem(entity)) {
 			return Special.SNOW_GOLEM;
 		}
 		if (entity instanceof Warden) {
@@ -191,7 +179,7 @@ final class ProfileFactory {
 		if (entity instanceof Armadillo || entity instanceof Frog) {
 			return Special.ROLL_ONTO_BACK;
 		}
-		if (entity instanceof AbstractSkeleton) {
+		if (Mobs.isSkeleton(entity)) {
 			return Special.SKELETON;
 		}
 		if (entity instanceof Creeper) {
@@ -212,20 +200,20 @@ final class ProfileFactory {
 		if (entity instanceof Guardian) {
 			return Special.GUARDIAN;
 		}
-		if (entity instanceof ZombieNautilus) {
+		if (Mobs.isZombieNautilus(entity)) {
 			return Special.ZOMBIE_NAUTILUS;
 		}
-		if (entity instanceof AbstractNautilus) {
+		if (Mobs.isNautilus(entity)) {
 			return Special.NAUTILUS;
 		}
 		return Special.NONE;
 	}
 
 	static BodyKind classify(LivingEntity entity) {
-		if (entity instanceof Ghast || entity instanceof HappyGhast) {
+		if (entity instanceof Ghast || Mobs.isHappyGhast(entity)) {
 			return BodyKind.GHAST;
 		}
-		if (entity instanceof Bat || entity instanceof Phantom || entity instanceof Parrot || entity instanceof Bee
+		if (entity instanceof Bat || entity instanceof Phantom || Mobs.isParrot(entity) || Mobs.isBee(entity)
 				|| entity instanceof Allay || entity instanceof Vex) {
 			return BodyKind.WINGED;
 		}
@@ -238,8 +226,8 @@ final class ProfileFactory {
 		if (entity instanceof Shulker) {
 			return BodyKind.SHULKER;
 		}
-		if (entity instanceof WaterAnimal || entity instanceof AgeableWaterCreature || entity instanceof Guardian
-				|| entity instanceof Axolotl || entity instanceof Turtle || entity instanceof AbstractNautilus) {
+		if (Mobs.isWaterAnimal(entity) || Mobs.isAgeableWaterCreature(entity) || entity instanceof Guardian
+				|| entity instanceof Axolotl || Mobs.isTurtle(entity) || Mobs.isNautilus(entity)) {
 			return BodyKind.AQUATIC;
 		}
 		return classifyUnknown(entity);

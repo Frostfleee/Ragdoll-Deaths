@@ -1,5 +1,9 @@
 package com.frostfleee.ragdolldeaths.client;
 
+import net.minecraft.world.phys.Vec3;
+
+import net.minecraft.core.BlockPos;
+
 import com.frostfleee.ragdolldeaths.core.BodyKind;
 import com.frostfleee.ragdolldeaths.core.RagdollAnimator;
 import com.frostfleee.ragdolldeaths.core.RagdollConfig;
@@ -16,7 +20,6 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
-import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -38,11 +41,12 @@ public final class RagdollTracker {
 	private RagdollTracker() {
 	}
 
-	public void onStateCreated(EntityRenderer<?, ?> renderer, Entity entity, EntityRenderState state, float partialTicks) {
+	public void onStateCreated(EntityRenderer renderer, Entity entity, EntityRenderState state, float partialTicks) {
+		RagdollRenderData.clear(state);
 		if (!(entity instanceof LivingEntity living) || living.deathTime <= 0) {
 			return;
 		}
-		if (!(state instanceof LivingEntityRenderState livingState) || !(renderer instanceof LivingEntityRenderer<?, ?, ?>)) {
+		if (!(state instanceof LivingEntityRenderState livingState) || !(renderer instanceof LivingEntityRenderer)) {
 			return;
 		}
 
@@ -86,6 +90,9 @@ public final class RagdollTracker {
 			return;
 		}
 		active.remove(entity.getId());
+		if (keepsDeadPlayer(ragdoll)) {
+			ragdoll.keepAsGhost();
+		}
 		if (ragdoll.keptAsGhost()) {
 			ragdoll.becomeGhost(tick);
 			ghosts.put(ragdoll.entity, ragdoll);
@@ -106,8 +113,16 @@ public final class RagdollTracker {
 		deathCamera(config);
 
 		active.values().removeIf(ragdoll -> {
-			boolean gone = ragdoll.entity.isRemoved() || !ragdoll.entity.isDeadOrDying() || ragdoll.age(tick, 0.0F) > STALE_AFTER_TICKS;
-			if (gone) {
+			// A dead player is not removed until they respawn, so their body never turns into a ghost: it is not stale,
+			// and lasts its lifetime (isFinished) or until the respawn.
+			boolean stale = ragdoll.age(tick, 0.0F) > STALE_AFTER_TICKS && !(ragdoll.entity instanceof net.minecraft.world.entity.player.Player);
+			boolean gone = ragdoll.entity.isRemoved() || !ragdoll.entity.isDeadOrDying() || stale;
+			if (gone && ragdoll.entity.isRemoved() && keepsDeadPlayer(ragdoll)) {
+				// removed with no unload event (the dead local player on 1.21.x): kept, as onUnload would
+				ragdoll.keepAsGhost();
+				ragdoll.becomeGhost(tick);
+				ghosts.put(ragdoll.entity, ragdoll);
+			} else if (gone) {
 				ragdoll.discard();
 			}
 			return gone;
@@ -157,8 +172,48 @@ public final class RagdollTracker {
 		}
 	}
 
+	/** Where a dead entity's physics body has its head on the frame being drawn, or null if it has none. */
+	public net.minecraft.world.phys.Vec3 bodyHead(LivingEntity entity, float partialTicks) {
+		ActiveRagdoll ragdoll = find(entity);
+		return ragdoll == null ? null : ragdoll.physicsHead(partialTicks);
+	}
+
+	/** The ghost bodies to draw in this level, for versions that draw entities from a list instead of extracting them. */
+	public java.util.List<LivingEntity> ghostEntities(ClientLevel drawnLevel) {
+		java.util.List<LivingEntity> out = new java.util.ArrayList<>();
+		RagdollConfig config = ConfigStore.get();
+		for (ActiveRagdoll ghost : ghosts.values()) {
+			if (ghost.entity.level() == drawnLevel && EntityFilter.withinRenderDistance(ghost.entity.position(), config)) {
+				out.add(ghost.entity);
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * A dead player is removed without the death poof on some versions (1.21.x), so it is never marked to be kept; a
+	 * physics body of theirs is kept all the same, as a mob's would be, and so is any body of theirs that is to stay until
+	 * they respawn.
+	 */
+	private static boolean keepsDeadPlayer(ActiveRagdoll ragdoll) {
+		return !ragdoll.keptAsGhost() && ragdoll.entity instanceof net.minecraft.world.entity.player.Player && ragdoll.entity.isDeadOrDying()
+				&& (ragdoll.isPhysical() || ragdoll.keptUntilRespawn(ConfigStore.get()));
+	}
+
+	/** For the self-test: what the tracker holds for an entity. */
+	String describe(LivingEntity entity) {
+		ActiveRagdoll ragdoll = find(entity);
+		return (ragdoll == null ? "no body" : ragdoll.isPhysical() ? "physics body" : "animated body") + ", eligible " + EntityFilter.isEligible(entity, ConfigStore.get())
+				+ ", deathTime " + entity.deathTime + ", removed " + entity.isRemoved() + ", failed type " + failedTypes.contains(entity.getType());
+	}
+
+	/** Ticks counted by the tracker, for anything that moves smoothly over time. */
+	public long ticks() {
+		return tick;
+	}
+
 	/** Adds the ghost bodies to the frame being extracted; each loader calls this at the end of level extraction. */
-	public void extractGhosts(ClientLevel extractedLevel, LevelRenderState levelState, float partialTicks) {
+	public void extractGhosts(ClientLevel extractedLevel, java.util.List<EntityRenderState> output, float partialTicks) {
 		if (ghosts.isEmpty()) {
 			return;
 		}
@@ -170,9 +225,9 @@ public final class RagdollTracker {
 				continue;
 			}
 			try {
-				EntityRenderState state = Minecraft.getInstance().getEntityRenderDispatcher().extractEntity(ghost.entity, partialTicks);
+				EntityRenderState state = Compat.extractState(ghost.entity, partialTicks);
 				if (RagdollRenderData.pose(state) != null) {
-					levelState.entityRenderStates.add(state);
+					output.add(state);
 				}
 			} catch (RuntimeException e) {
 				iterator.remove();
@@ -214,7 +269,8 @@ public final class RagdollTracker {
 		while (PhysicsHost.INSTANCE.count() >= config.maxBodies) {
 			ActiveRagdoll oldest = null;
 			for (ActiveRagdoll ghost : ghosts.values()) {
-				if (ghost.isPhysical() && (oldest == null || ghost.startTick() < oldest.startTick())) {
+				// a player's body kept until they respawn is not let go to make room
+				if (ghost.isPhysical() && !ghost.keptUntilRespawn(config) && (oldest == null || ghost.startTick() < oldest.startTick())) {
 					oldest = ghost;
 				}
 			}
@@ -238,7 +294,7 @@ public final class RagdollTracker {
 		return ragdoll;
 	}
 
-	private ActiveRagdoll capture(EntityRenderer<?, ?> renderer, LivingEntity entity) {
+	private ActiveRagdoll capture(EntityRenderer renderer, LivingEntity entity) {
 		RagdollConfig config = ConfigStore.get();
 		if (entity.isRemoved() || !entity.isDeadOrDying() || active.size() >= config.maxActiveRagdolls) {
 			return null;
@@ -246,21 +302,31 @@ public final class RagdollTracker {
 		if (failedTypes.contains(entity.getType()) || !EntityFilter.isEligible(entity, config)) {
 			return null;
 		}
-		ActiveRagdoll ragdoll = new ActiveRagdoll(entity, ProfileFactory.create((LivingEntityRenderer<?, ?, ?>) renderer, entity, config), tick, config);
+		ActiveRagdoll ragdoll = new ActiveRagdoll(entity, ProfileFactory.create((LivingEntityRenderer) renderer, entity, config), tick, config);
 		active.put(entity.getId(), ragdoll);
 		if (ragdoll.isPhysical()) {
 			makeRoomForBody(config);
 		}
-		if (ragdoll.profile.kind() == BodyKind.SHULKER && entity instanceof Shulker shulker) {
-			breakShell(shulker);
+		if (ragdoll.profile.kind() == BodyKind.SHULKER && entity instanceof Shulker shulker && !ragdoll.isPhysical()) {
+			// The classic death: the shulker breaks at once. A physics shulker tumbles first and breaks when it goes.
+			breakShell(shulker, shulker.position());
 		}
 		return ragdoll;
 	}
 
-	/** The shulker breaks apart like a shulker box of its color: the box's own break particles, in the same spots and number. */
-	private static void breakShell(Shulker shulker) {
+	/**
+	 * The shulker breaks apart like a shulker box of its color: the box's own break particles, in the same spots and
+	 * number, and the sound of the box breaking, heard only by you.
+	 */
+	static void breakShell(Shulker shulker, Vec3 where) {
 		DyeColor color = shulker.getColor();
-		shulker.level().addDestroyBlockEffect(shulker.blockPosition(), Compat.shulkerBox(color).defaultBlockState());
+		net.minecraft.world.level.block.state.BlockState box = Compat.shulkerBox(color).defaultBlockState();
+		shulker.level().addDestroyBlockEffect(BlockPos.containing(where), box);
+		if (ConfigStore.get().impactSounds) {
+			net.minecraft.world.level.block.SoundType sound = box.getSoundType();
+			shulker.level().playLocalSound(where.x, where.y, where.z, sound.getBreakSound(), net.minecraft.sounds.SoundSource.BLOCKS,
+					(sound.getVolume() + 1.0F) / 2.0F, sound.getPitch() * 0.8F, false);
+		}
 	}
 
 	private void fail(LivingEntity entity, EntityRenderState state, RuntimeException error) {

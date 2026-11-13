@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
@@ -48,7 +47,7 @@ final class RagdollBuilder {
 		ModelPart part;
 		JointRole role;
 		Matrix4f matrix;
-		PartPose rest;
+		Rest rest;
 		/** Where this part's limb is cut, when this is the upper half of one. */
 		float splitY = Float.NaN;
 		/** The upper half this lower half hangs from, or null for a part hung from the torso. */
@@ -69,13 +68,14 @@ final class RagdollBuilder {
 	 * @param pose model space to camera-relative world space, as the model is about to be drawn
 	 * @throws IllegalStateException when the model has no torso to build around; the caller falls back
 	 */
-	static void build(PhysicsRagdoll ragdoll, Model<?> model, Object state, Matrix4f pose) {
-		ModelPart root = model.root();
+	static void build(PhysicsRagdoll ragdoll, Model model, Object state, Matrix4f pose) {
+		ModelPart root = Compat.root(model);
 		Matrix4f rootMatrix = ModelMath.mul(new Matrix4f(pose), root);
 
 		List<Piece> pieces = new ArrayList<>();
 		// Top-level parts that are not bodies themselves ride on the torso; anything inside them follows them.
 		List<String[]> riders = new ArrayList<>();
+		shellModel = ragdoll.entity instanceof net.minecraft.world.entity.monster.Shulker;
 		collect(root, root, new String[0], rootMatrix, null, true, pieces, riders);
 		Piece torso = null;
 		for (Piece piece : pieces) {
@@ -133,7 +133,7 @@ final class RagdollBuilder {
 			Matrix4f matrix = ModelMath.mul(new Matrix4f(rootMatrix), part);
 			// A breeze's whirlwind dies with it.
 			boolean hidden = JointNames.roleOf(JointNames.tokens(path[0])) == JointRole.WIND;
-			links.add(new PhysicsRagdoll.Link(path, 0, offset(torso.body, matrix, ragdoll), part.getInitialPose(), Float.NaN, hidden));
+			links.add(new PhysicsRagdoll.Link(path, 0, offset(torso.body, matrix, ragdoll), Rest.of(part), Float.NaN, hidden));
 		}
 		// Each part's place is worked out from the part it hangs from, so that one has to be placed first.
 		links.sort(java.util.Comparator.comparingInt(link -> link.path().length));
@@ -194,11 +194,11 @@ final class RagdollBuilder {
 					torque += Muscles.weightTorque(other.body.mass, distance(other.body, from) * 0.75);
 				}
 			}
-			var rest = animated.getInitialPose();
+			var rest = Rest.of(animated);
 			fibres.add(new Muscles.Fibre(joint, piece.role, named.side(), named.index(), piece.upper != null, piece.parent != null,
 					new float[] {rest.xRot(), rest.yRot(), rest.zRot()}, piece.upper == null ? piece.died : piece.upper.died, torque));
 		}
-		var torsoRest = torso.part.getInitialPose();
+		var torsoRest = Rest.of(torso.part);
 		return new Muscles(fibres, torsoIndex, new float[] {torsoRest.xRot(), torsoRest.yRot(), torsoRest.zRot()}, torso.died,
 				entity.getUUID().getMostSignificantBits() ^ entity.level().getGameTime());
 	}
@@ -213,7 +213,7 @@ final class RagdollBuilder {
 	 * its spin. That works for any model, without knowing how it animates.
 	 */
 	@SuppressWarnings("unchecked")
-	private static void carrySwing(Model<?> model, Object state, List<Piece> pieces, Matrix4f rootMatrix, PhysicsRagdoll ragdoll) {
+	private static void carrySwing(Model model, Object state, List<Piece> pieces, Matrix4f rootMatrix, PhysicsRagdoll ragdoll) {
 		if (!(state instanceof LivingEntityRenderState living) || living.walkAnimationSpeed < 0.05F) {
 			return;
 		}
@@ -228,7 +228,7 @@ final class RagdollBuilder {
 		try {
 			living.walkAnimationPos = position + living.walkAnimationSpeed * SWING_SAMPLE_TICKS;
 			living.ageInTicks = age + SWING_SAMPLE_TICKS;
-			((Model<Object>) model).setupAnim(state);
+			Compat.setupAnim(model, state);
 			// The matrix scales the model; a direction through it has to be brought back to unit length.
 			float scale = rootMatrix.transformDirection(new Vector3f(1.0F, 0.0F, 0.0F)).length();
 			for (int i = 0; i < pieces.size(); i++) {
@@ -258,7 +258,7 @@ final class RagdollBuilder {
 		} finally {
 			living.walkAnimationPos = position;
 			living.ageInTicks = age;
-			((Model<Object>) model).setupAnim(state);
+			Compat.setupAnim(model, state);
 		}
 	}
 
@@ -287,21 +287,21 @@ final class RagdollBuilder {
 			// Both arms as one folded piece across the chest (a villager's, a witch's): that is part of the torso. On a
 			// joint of its own it swings into the body.
 			boolean foldedArms = role == JointRole.ARM && JointNames.sideOf(JointNames.tokens(name)) == com.frostfleee.ragdolldeaths.core.JointPose.Side.CENTER
-					&& Math.abs(part.getInitialPose().x()) < 0.01F;
+					&& Math.abs(Rest.of(part).x()) < 0.01F;
 			if (role != null && simulated(role) && !foldedArms && part.visible && allowedIn(container, role)) {
 				boolean bends = ConfigStore.get().kneesAndElbows && container == null && (role == JointRole.ARM || role == JointRole.LEG);
 				float plane = bends ? LimbSplitter.planeOf(part) : Float.NaN;
 				LimbSplitter.Split split = Float.isNaN(plane) ? null : LimbSplitter.split(root, part, plane);
-				piece = measure(childPath, part, split == null ? part : split.upper(), role, matrix, part.getInitialPose());
+				piece = measure(childPath, part, split == null ? part : split.upper(), role, matrix, Rest.of(part));
 				if (piece != null) {
 					piece.parent = container;
 					piece.parentSpace = new Matrix4f(parentSpace);
 					pieces.add(piece);
 					if (split != null) {
-						Matrix4f lowerMatrix = ModelMath.mul(new Matrix4f(matrix), split.lower().getInitialPose());
+						Matrix4f lowerMatrix = ModelMath.mul(new Matrix4f(matrix), Rest.of(split.lower()));
 						String[] lowerPath = java.util.Arrays.copyOf(childPath, childPath.length + 1);
 						lowerPath[childPath.length] = LimbSplitter.LOWER;
-						Piece lower = measure(lowerPath, split.lower(), split.lower(), role, lowerMatrix, split.lower().getInitialPose());
+						Piece lower = measure(lowerPath, split.lower(), split.lower(), role, lowerMatrix, Rest.of(split.lower()));
 						if (lower != null) {
 							piece.splitY = plane;
 							lower.upper = piece;
@@ -318,8 +318,19 @@ final class RagdollBuilder {
 		}
 	}
 
-	/** The part's role. Parts named after the body with a number ({@code body0}, a spider's) count as bodies too. */
+	/** Whether the model being built is a shulker's. Building runs on one thread. */
+	private static boolean shellModel;
+
+	/**
+	 * The part's role. Parts named after the body with a number ({@code body0}, a spider's) count as bodies too, and
+	 * a shulker is a single box (see shellModel).
+	 */
 	private static JointRole roleOf(String name) {
+		if (shellModel) {
+			// A shulker is one rigid box around its whole shell, lid and head: the shell collides as the full cube it
+			// is, on every side, and the head stays tucked inside it as it tumbles.
+			return null;
+		}
 		JointRole role = JointNames.roleOf(JointNames.tokens(name));
 		if (role == null && name.matches("(body|torso)\\d+")) {
 			return JointRole.BODY;
@@ -393,7 +404,7 @@ final class RagdollBuilder {
 		piece.role = JointRole.BODY;
 		piece.matrix = new Matrix4f(rootMatrix);
 		piece.parentSpace = new Matrix4f(rootMatrix);
-		piece.rest = PartPose.ZERO;
+		piece.rest = Rest.ZERO;
 		piece.died = new float[3];
 		piece.centre.set((bounds[0] + bounds[3]) / 2.0F, (bounds[1] + bounds[4]) / 2.0F, (bounds[2] + bounds[5]) / 2.0F);
 		piece.half.set((bounds[3] - bounds[0]) / 2.0F, (bounds[4] - bounds[1]) / 2.0F, (bounds[5] - bounds[2]) / 2.0F);
@@ -433,7 +444,7 @@ final class RagdollBuilder {
 	}
 
 	/** Measures the cubes of {@code shape} (the part itself, or the half of it that stands in for it). */
-	private static Piece measure(String[] path, ModelPart part, ModelPart shape, JointRole role, Matrix4f matrix, PartPose rest) {
+	private static Piece measure(String[] path, ModelPart part, ModelPart shape, JointRole role, Matrix4f matrix, Rest rest) {
 		List<ModelPart.Cube> cubes = ((ModelPartAccessor) (Object) shape).ragdolldeaths$cubes();
 		if (cubes.isEmpty()) {
 			return null;
@@ -599,6 +610,12 @@ final class RagdollBuilder {
 	 */
 	private static Vec3 velocityOf(LivingEntity entity) {
 		Vec3 moved = entity.position().subtract(entity.xo, entity.yo, entity.zo).scale(TICKS_PER_SECOND);
+		// Your own player is moved by your client the moment it is hit, not later by the server as mobs are, so its
+		// last tick already holds the killing blow's knockback, which DeathBlow adds as well. Only a fall is kept.
+		if (entity == net.minecraft.client.Minecraft.getInstance().player && entity.getLastDamageSource() != null
+				&& entity.getLastDamageSource().getSourcePosition() != null) {
+			moved = new Vec3(0.0, Math.min(0.0, moved.y), 0.0);
+		}
 		double speed = moved.length();
 		return speed > MAX_CARRIED_SPEED ? moved.scale(MAX_CARRIED_SPEED / speed) : moved;
 	}

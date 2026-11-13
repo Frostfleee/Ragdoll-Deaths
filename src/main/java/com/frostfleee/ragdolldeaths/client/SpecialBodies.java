@@ -77,7 +77,7 @@ final class SpecialBodies {
 		}
 		if (special == Special.SNOW_GOLEM) {
 			SpecialBodies made = new SpecialBodies(Kind.SNOW_GOLEM, bodies.length, seed);
-			ragdoll.hideHead = entity instanceof net.minecraft.world.entity.animal.golem.SnowGolem golem && golem.hasPumpkin();
+			ragdoll.hideHead = Mobs.snowGolemHasPumpkin(entity);
 			// The pumpkin is only resting on top: it comes off, nudged a little to one side.
 			for (Joint joint : ragdoll.island.joints) {
 				if (ragdoll.roles[indexOf(bodies, joint.b)] == JointRole.HEAD) {

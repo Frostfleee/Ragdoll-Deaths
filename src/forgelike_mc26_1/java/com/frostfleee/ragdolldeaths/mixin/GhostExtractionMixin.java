@@ -22,7 +22,7 @@ abstract class GhostExtractionMixin {
 	private void ragdolldeaths$extractGhosts(Camera camera, Frustum frustum, DeltaTracker deltaTracker, LevelRenderState output, CallbackInfo ci) {
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft.level != null) {
-			RagdollTracker.INSTANCE.extractGhosts(minecraft.level, output, deltaTracker.getGameTimeDeltaPartialTick(true));
+			RagdollTracker.INSTANCE.extractGhosts(minecraft.level, output.entityRenderStates, deltaTracker.getGameTimeDeltaPartialTick(true));
 		}
 	}
 }

@@ -1,4 +1,13 @@
-# Ragdoll Deaths
+<p align="center"><img src="src/main/resources/assets/ragdolldeaths/icon.png" width="128" alt="Ragdoll Deaths icon"></p>
+
+<h1 align="center">Ragdoll Deaths</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Minecraft-1.21--26.3-62b47a" alt="Minecraft 1.21-26.3">
+  <img src="https://img.shields.io/badge/loaders-Fabric%20%7C%20Quilt%20%7C%20NeoForge%20%7C%20Forge-4a7bbf" alt="Fabric, Quilt, NeoForge, Forge">
+  <img src="https://img.shields.io/badge/side-client-8a8a8a" alt="Client-side">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
+</p>
 
 A small, client-side visual mod. When a mob dies, its body becomes a real physics ragdoll: it is thrown by the killing blow, tumbles over whatever blocks are there, comes to rest, and disappears about 5 seconds later in a puff of smoke where it lay. Nothing changes gameplay.
 
@@ -6,15 +15,15 @@ A small, client-side visual mod. When a mob dies, its body becomes a real physic
 
 | | |
 |---|---|
-| Minecraft | Java Edition **26.1 to 26.3** |
+| Minecraft | Java Edition **1.21 to 1.21.11** and **26.1 to 26.3** (Forge: every version that has a Forge release) |
 | Loader | **Fabric** 0.18.0+, **Quilt** 0.30.1+, **NeoForge** or **Forge** |
 | Required mod | **Fabric API** on Fabric and Quilt; nothing on NeoForge or Forge |
 | Optional | **Mod Menu** on Fabric and Quilt, for the in-game settings screen |
-| Java | 25 |
+| Java | 21 for 1.21.x, 25 for 26.x |
 
 ## Installation
 
-Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.1.0 - NeoForge 26.2-26.3.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
+Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.1.1 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.1.1 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
 
 The mod is **client-only**. Servers don't need it, and every loader skips it on a dedicated server, so no rendering code ever loads server-side. In multiplayer, each player who installs it sees the ragdolls on their own screen.
 
@@ -78,7 +87,7 @@ Whatever pose the mob died in (a horse rearing from the hit, a sitting wolf or c
 | Nautiluses | The body pulls back into the shell. In water the shell turns its opening up and floats away; on land it rocks and tips onto its side. A zombie nautilus's rotten body slumps half out of the shell and hangs instead. |
 | Slimes and sulfur cubes | The hit stretches the body tall as it leans away, then it slumps into a wide puddle and wobbles like jelly before settling. Splitting is unchanged. |
 | Magma cubes | Stiffer: they fold down in three stacked steps, like a collapsing accordion, with a small clack at each step. |
-| Shulkers | No gravity and no animation: the shulker disappears the moment it dies and breaks apart into the same particles, in the same spots and number, as breaking a shulker box of its color (purple for an undyed shulker). |
+| Shulkers | With Physics Bodies off, the shulker disappears the moment it dies and breaks apart into the same particles, in the same spots and number, as breaking a shulker box of its color (purple for an undyed shulker), with the box's breaking sound. With physics on it tumbles first and breaks when its time is up. |
 | Anything else | The head droops, arms hang, and tails, ears and jaws go slack. |
 
 **Special deaths:**
@@ -175,7 +184,8 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | Skeletons Break Apart | On | Off, skeletons fall in one piece. |
 | Impact Sounds | On | Thuds, splashes, bone clatter. |
 | Impact Dust | On | Block dust on hard landings, drops on splashes. |
-| Death Camera | Off | Third person while you are dead. |
+| Death Camera | Off | While you are dead, the view follows your body's head and slowly circles it. |
+| Player Body Until Respawn | On | A player's body stays until they respawn, instead of going after the body lifetime. |
 
 ## Compatibility philosophy
 
@@ -212,11 +222,11 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 ./build-all.sh
 ```
 
-This builds every jar, one per loader and game-version group, into `Desktop/Ragdoll Deaths/<Loader>/`. `./gradlew build` alone makes the Fabric jar for 26.2–26.3 in `build/libs/`, `./gradlew test` runs the unit tests, and `./gradlew runClient` starts a development client.
+This builds every jar, one per loader and game-version group, into `Desktop/Ragdoll Deaths/Builds/<Loader>/`. `./gradlew build` alone makes the Fabric jar for 26.2–26.3 in `build/libs/`, `./gradlew test` runs the unit tests, and `./gradlew runClient` starts a development client. `./gradlew -p legacy runClient -Pminecraft_version=… -Pcompat=…` does the same for 1.21.x (see `build-all.sh` for the values). `./selftest-all.sh all` checks every jar group in a real world (see TESTING.md).
 
 How the sources are split:
 
 - `src/main`: everything that doesn't depend on the loader or the game version.
-- `src/mc26_1` and `src/mc26_2`: the few calls that changed between 26.1 and 26.2 (`Compat` and one mixin).
-- `src/fabric`, `src/quilt`, `src/neoforge`, `src/forge`: each loader's entrypoint and metadata. `src/forgelike_*` holds the ghost-body mixin that NeoForge and Forge use in place of Fabric API's extraction event.
-- The root Gradle build makes the Fabric and Quilt jars; `neoforge/` and `forge/` are separate Gradle builds over the same sources.
+- `src/mc1_21_0`, `src/mc1_21_2`, `src/mc1_21_5`, `src/mc1_21_9`, `src/mc1_21_11`, `src/mc26_1`, `src/mc26_2`: what differs between game versions: `Compat` (calls that moved), `Mobs` (mob classes that moved), `VanillaPoses`, and the mixins whose targets changed. 1.21.2 to 1.21.8 draw a mob straight away instead of submitting it, so their render mixins are different hooks altogether. 1.21 and 1.21.1 have no render states at all: `src/mc1_21_0` carries stand-ins of its own (in `net/minecraft/client/renderer/entity/state`, used only by the mod), filled by `RagdollStates` just before a dying mob is drawn, and `ModelRoots` finds the root part most of its models do not keep.
+- `src/fabric`, `src/quilt`, `src/neoforge`, `src/forge`: each loader's entrypoint and metadata. `src/forge_bus6`, `src/forge_bus7class` and `src/forge_bus7` are Forge's client half for its old event bus (before 1.21.6), the new one (1.21.6 to 1.21.8) and the new one with record events (1.21.9 and later); before 1.21.10 the Forge jar also carries MixinExtras (`-Pbundle_mixinextras`). `src/forgelike_*` holds the ghost-body mixin that NeoForge and Forge use in place of Fabric API's extraction event, and for 1.21 an access transformer.
+- The root Gradle build makes the Fabric and Quilt jars for 26.x; `legacy/` makes them for 1.21.x, whose game files are obfuscated and mapped while building; `neoforge/` and `forge/` are separate Gradle builds over the same sources, for every game version (`-Pjava_version=21` for 1.21.x).

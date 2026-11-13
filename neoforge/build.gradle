@@ -16,7 +16,9 @@ base {
 	archivesName = 'ragdoll-deaths-neoforge'
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+// 26.x runs on Java 25, 1.21.x on Java 21.
+def javaVersion = (project.findProperty('java_version') ?: '25') as int
+java.toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)
 
 sourceSets {
 	main {
@@ -24,13 +26,32 @@ sourceSets {
 			srcDirs = ["$src/main/java", "$src/$compat/java", "$src/neoforge/java", "$src/forgelike_$compat/java"]
 		}
 		resources {
-			srcDirs = ["$src/main/resources", "$src/neoforge/resources", "$src/forgelike/resources"]
+			srcDirs = ["$src/main/resources", "$src/neoforge/resources", "$src/forgelike/resources", "$src/forgelike_$compat/resources"]
 		}
 	}
 }
 
+// 1.21 and 1.21.1 need some game classes opened (src/forgelike_mc1_21_0/resources/META-INF/accesstransformer.cfg).
+def atFile = file("$src/forgelike_$compat/resources/META-INF/accesstransformer.cfg")
+
 neoForge {
 	version = project.neo_version
+	if (atFile.exists()) {
+		accessTransformers = files(atFile)
+	}
+	// ./gradlew -p neoforge runClient starts the game with the mod, for checking it loads.
+	runs {
+		client {
+			client()
+			gameDirectory = layout.buildDirectory.dir('run').get().asFile
+			// Verbose Mixin logging lists every class the mod changes.
+			jvmArgument('-Dmixin.debug.verbose=true')
+			// -Pselftest makes the game create a world, kill some mobs and the player, log SELFTEST lines and quit (see SelfTest).
+			if (project.hasProperty('selftest')) {
+				jvmArgument('-Dragdolldeaths.selftest=true')
+			}
+		}
+	}
 	mods {
 		ragdolldeaths {
 			sourceSet(sourceSets.main)
@@ -41,8 +62,24 @@ neoForge {
 processResources {
 	def props = [version: project.mod_version, minecraftRange: project.minecraft_range]
 	inputs.properties props
+	// the mixin list depends on the game version; bump filterRevision when editing the filters below
+	inputs.property 'compat', compat
+	inputs.property 'filterRevision', 5
 	filesMatching('META-INF/neoforge.mods.toml') {
 		expand props
+		if (atFile.exists()) {
+			filter { it == 'config = "ragdolldeaths.ghosts.mixins.json"' ? it + '\n\n[[accessTransformers]]\nfile = "META-INF/accesstransformer.cfg"' : it }
+		}
+	}
+	if (javaVersion < 25) {
+		filesMatching('ragdolldeaths.mixins.json') {
+			filter { it.replace('"JAVA_25"', '"JAVA_21"') }
+			// 1.21 and 1.21.1 have no render states: their hooks make the mod's own stand-ins instead (src/mc1_21_0).
+			if (compat == 'mc1_21_0') {
+				filter { it.replace('"EntityRendererMixin",', '"ModelBakeMixin", "ModelRootMixin", "AgeableListModelAccessor", "CubeAccessor", "SlimeSquishMixin",').replace('"LivingEntityRendererAccessor",', '"LivingEntityRendererFlipAccessor",') }
+				filter { it.replace('"EntityRenderStateMixin",', '') }
+			}
+		}
 	}
 }
 

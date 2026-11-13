@@ -88,7 +88,7 @@ final class LimbCollider {
 			Vec3 feet, double cos, double sin) {
 		JointRole role = joint.role();
 		Side side = joint.side();
-		var rest = joint.part().getInitialPose();
+		var rest = Rest.of(joint.part());
 		double toRestX = rest.xRot() - joints.rotation(role, side, JointPose.X, joint.index(), rest.xRot());
 		double toRestZ = side == Side.CENTER ? 0.0 : rest.zRot() - joints.rotation(role, side, JointPose.Z, joint.index(), rest.zRot());
 		double swingZ = side == Side.LEFT ? -toRestZ : toRestZ;
@@ -119,7 +119,7 @@ final class LimbCollider {
 			float reach, boolean up, Vec3 feet, double cos, double sin) {
 		JointRole role = joint.role();
 		Side side = joint.side();
-		var rest = joint.part().getInitialPose();
+		var rest = Rest.of(joint.part());
 		double rx = joints.rotation(role, side, JointPose.X, joint.index(), rest.xRot()) + swingX * keep;
 		double ry = joints.rotation(role, side, JointPose.Y, joint.index(), rest.yRot());
 		double rz = joints.rotation(role, side, JointPose.Z, joint.index(), rest.zRot()) + (side == Side.LEFT ? -swingZ : swingZ) * keep;

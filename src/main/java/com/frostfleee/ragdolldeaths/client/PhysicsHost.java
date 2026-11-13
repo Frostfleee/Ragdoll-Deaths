@@ -170,8 +170,10 @@ final class PhysicsHost {
 		strained = ms > SOFT_BUDGET_MS ? STRAIN_TICKS : Math.max(0, strained - 1);
 		overrun = ms > HARD_BUDGET_MS ? overrun + 1 : 0;
 		if (overrun >= OVERRUN_TICKS) {
+			boolean keepPlayers = ConfigStore.get().playerBodyUntilRespawn;
 			for (PhysicsRagdoll ragdoll : ragdolls) {
-				if (!ragdoll.retired) {
+				// a player's body kept until they respawn is not let go (see Player Body Until Respawn)
+				if (!ragdoll.retired && !(keepPlayers && ragdoll.entity instanceof net.minecraft.world.entity.player.Player)) {
 					ragdoll.retired = true;
 					break;
 				}

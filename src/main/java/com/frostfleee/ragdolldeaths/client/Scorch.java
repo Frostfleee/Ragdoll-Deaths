@@ -10,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.FluidState;
@@ -35,7 +34,8 @@ final class Scorch {
 	private static final int RING = 2;
 	private static int counter;
 
-	final Identifier id;
+	/** The burnt copy's texture id; its type is the game version's own resource id class. */
+	final Object id;
 	private final NativeImage original;
 	private final DynamicTexture texture;
 	private final int width, height;
@@ -57,26 +57,21 @@ final class Scorch {
 		NativeImage copy = new NativeImage(width, height, false);
 		for (int y = 0; y < height; y++) {
 			for (int x = 0; x < width; x++) {
-				copy.setPixel(x, y, original.getPixel(x, y));
+				Compat.setPixel(copy, x, y, Compat.getPixel(original, x, y));
 			}
 		}
-		texture = new DynamicTexture(() -> "ragdolldeaths scorch", copy);
-		id = Identifier.fromNamespaceAndPath(RagdollDeathsClient.MOD_ID, "scorch/" + counter++);
-		Minecraft.getInstance().getTextureManager().register(id, texture);
+		texture = Compat.newTexture("ragdolldeaths scorch", copy);
+		id = Compat.registerTexture(RagdollDeathsClient.MOD_ID, "scorch/" + counter++, texture);
 	}
 
 	/** A scorchable copy of a texture, or null when its pixels cannot be read (a player's skin, say). */
-	static Scorch of(Identifier base) {
+	static Scorch of(Object base) {
 		if (base == null) {
 			return null;
 		}
 		try {
-			var resource = Minecraft.getInstance().getResourceManager().getResource(base);
-			if (resource.isEmpty()) {
-				return null;
-			}
-			try (InputStream in = resource.get().open()) {
-				return new Scorch(NativeImage.read(in));
+			try (InputStream in = Compat.openResource(base)) {
+				return in == null ? null : new Scorch(NativeImage.read(in));
 			}
 		} catch (Exception e) {
 			return null;
@@ -86,7 +81,7 @@ final class Scorch {
 	void close() {
 		if (!closed) {
 			closed = true;
-			Minecraft.getInstance().getTextureManager().release(id);
+			Compat.releaseTexture(id);
 			original.close();
 		}
 	}
@@ -96,7 +91,7 @@ final class Scorch {
 		if (closed || ragdoll.mainModel == null) {
 			return;
 		}
-		ModelPart root = ragdoll.mainModel.root();
+		ModelPart root = Compat.root(ragdoll.mainModel);
 		Level level = ragdoll.entity.level();
 		// Which parts are placed by a body; the rest are carried along inside one of those.
 		Map<ModelPart, PhysicsRagdoll.Link> driven = new IdentityHashMap<>();
@@ -128,7 +123,7 @@ final class Scorch {
 		// A limb cut in two is drawn as its halves, not as itself.
 		if (!children.containsKey(LimbSplitter.UPPER)) {
 			for (ModelPart.Cube cube : access.ragdolldeaths$cubes()) {
-				for (ModelPart.Polygon face : cube.polygons) {
+				for (ModelPart.Polygon face : Compat.polygons(cube)) {
 					changed |= burn(face, space, level, origin);
 				}
 			}
@@ -143,18 +138,18 @@ final class Scorch {
 
 	/** One face of a cube: the patch of texture it shows, each pixel of it placed on the face and tested. */
 	private boolean burn(ModelPart.Polygon face, Matrix4f space, Level level, Body origin) {
-		ModelPart.Vertex[] v = face.vertices();
+		ModelPart.Vertex[] v = Compat.vertices(face);
 		if (v.length < 4) {
 			return false;
 		}
 		// The face is a parallelogram and its texture patch a rectangle: corner 1 is the patch's origin, corner 0
 		// lies along U from it and corner 2 along V.
-		float du = v[0].u() - v[1].u(), dv = v[2].v() - v[1].v();
+		float du = Compat.vu(v[0]) - Compat.vu(v[1]), dv = Compat.vv(v[2]) - Compat.vv(v[1]);
 		if (Math.abs(du) < 1.0E-6F || Math.abs(dv) < 1.0E-6F) {
 			return false;
 		}
-		int x0 = Math.max(0, (int) Math.floor(Math.min(v[0].u(), v[1].u()) * width)), x1 = Math.min(width, (int) Math.ceil(Math.max(v[0].u(), v[1].u()) * width));
-		int y0 = Math.max(0, (int) Math.floor(Math.min(v[1].v(), v[2].v()) * height)), y1 = Math.min(height, (int) Math.ceil(Math.max(v[1].v(), v[2].v()) * height));
+		int x0 = Math.max(0, (int) Math.floor(Math.min(Compat.vu(v[0]), Compat.vu(v[1])) * width)), x1 = Math.min(width, (int) Math.ceil(Math.max(Compat.vu(v[0]), Compat.vu(v[1])) * width));
+		int y0 = Math.max(0, (int) Math.floor(Math.min(Compat.vv(v[1]), Compat.vv(v[2])) * height)), y1 = Math.min(height, (int) Math.ceil(Math.max(Compat.vv(v[1]), Compat.vv(v[2])) * height));
 		boolean changed = false;
 		for (int y = y0; y < y1; y++) {
 			for (int x = x0; x < x1; x++) {
@@ -162,10 +157,10 @@ final class Scorch {
 				if (burnt[at]) {
 					continue;
 				}
-				float s = ((x + 0.5F) / width - v[1].u()) / du, t = ((y + 0.5F) / height - v[1].v()) / dv;
-				point.set((v[1].x() + s * (v[0].x() - v[1].x()) + t * (v[2].x() - v[1].x())) / 16.0F,
-						(v[1].y() + s * (v[0].y() - v[1].y()) + t * (v[2].y() - v[1].y())) / 16.0F,
-						(v[1].z() + s * (v[0].z() - v[1].z()) + t * (v[2].z() - v[1].z())) / 16.0F);
+				float s = ((x + 0.5F) / width - Compat.vu(v[1])) / du, t = ((y + 0.5F) / height - Compat.vv(v[1])) / dv;
+				point.set((Compat.vx(v[1]) + s * (Compat.vx(v[0]) - Compat.vx(v[1])) + t * (Compat.vx(v[2]) - Compat.vx(v[1]))) / 16.0F,
+						(Compat.vy(v[1]) + s * (Compat.vy(v[0]) - Compat.vy(v[1])) + t * (Compat.vy(v[2]) - Compat.vy(v[1]))) / 16.0F,
+						(Compat.vz(v[1]) + s * (Compat.vz(v[0]) - Compat.vz(v[1])) + t * (Compat.vz(v[2]) - Compat.vz(v[1]))) / 16.0F);
 				space.transformPosition(point);
 				double wx = origin.x + point.x, wy = origin.y + point.y, wz = origin.z + point.z;
 				cursor.set(wx, wy, wz);
@@ -217,9 +212,9 @@ final class Scorch {
 			for (int x = 0; x < width; x++) {
 				int d = distance[y * width + x];
 				float keep = d == 0 ? BURNT : d <= RING ? RING_NEAR : d <= far ? RING_FAR : 1.0F;
-				int argb = original.getPixel(x, y);
+				int argb = Compat.getPixel(original, x, y);
 				int r = (int) ((argb >> 16 & 0xFF) * keep), g = (int) ((argb >> 8 & 0xFF) * keep), b = (int) ((argb & 0xFF) * keep);
-				pixels.setPixel(x, y, argb & 0xFF000000 | r << 16 | g << 8 | b);
+				Compat.setPixel(pixels, x, y, argb & 0xFF000000 | r << 16 | g << 8 | b);
 			}
 		}
 		texture.upload();

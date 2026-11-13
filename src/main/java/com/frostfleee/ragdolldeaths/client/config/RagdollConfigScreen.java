@@ -43,7 +43,7 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 	protected void addOptions() {
 		RagdollConfig c = draft;
 
-		list.addHeader(header("general"));
+		Compat.addHeader(list, header("general"), font);
 		list.addSmall(
 				toggle("enabled", c.enabled, v -> c.enabled = v),
 				toggle("playerRagdolls", c.playerRagdolls, v -> c.playerRagdolls = v),
@@ -53,7 +53,7 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				slider("maxActiveRagdolls", 4, 256, c.maxActiveRagdolls, v -> Component.literal(Integer.toString(v)), v -> c.maxActiveRagdolls = v),
 				toggle("hideDeathTint", c.hideDeathTint, v -> c.hideDeathTint = v));
 
-		list.addHeader(header("physics"));
+		Compat.addHeader(list, header("physics"), font);
 		list.addSmall(
 				toggle("physicsRagdolls", c.physicsRagdolls, v -> c.physicsRagdolls = v),
 				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
@@ -67,24 +67,25 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				toggle("impactSounds", c.impactSounds, v -> c.impactSounds = v),
 				toggle("impactParticles", c.impactParticles, v -> c.impactParticles = v),
 				toggle("deathCamera", c.deathCamera, v -> c.deathCamera = v),
+				toggle("playerBodyUntilRespawn", c.playerBodyUntilRespawn, v -> c.playerBodyUntilRespawn = v),
 				slider("bodyLifetimeTicks", 1, RagdollConfig.MAX_BODY_LIFETIME_TICKS / 20, c.bodyLifetimeTicks / 20,
 						v -> Component.translatable(KEY + "wholeSeconds", v), v -> c.bodyLifetimeTicks = v * 20));
 
-		list.addHeader(header("motion"));
+		Compat.addHeader(list, header("motion"), font);
 		list.addSmall(
 				percent("hitReactionStrength", 0, 200, c.hitReactionStrength, v -> c.hitReactionStrength = v),
 				percent("bounceStrength", 0, 200, c.bounceStrength, v -> c.bounceStrength = v),
 				toggle("limbAnimation", c.limbAnimation, v -> c.limbAnimation = v),
 				toggle("legKicks", c.legKicks, v -> c.legKicks = v));
 
-		list.addHeader(header("environment"));
+		Compat.addHeader(list, header("environment"), font);
 		list.addSmall(
 				waterBehavior(c),
 				toggle("lavaSink", c.lavaSink, v -> c.lavaSink = v),
 				toggle("fallImpact", c.fallImpact, v -> c.fallImpact = v),
 				toggle("throwRiders", c.throwRiders, v -> c.throwRiders = v));
 
-		list.addHeader(header("excludedEntities"));
+		Compat.addHeader(list, header("excludedEntities"), font);
 		Compat.addWide(list, idList("excludedEntities", c.excludedEntities, ids -> c.excludedEntities = ids));
 	}
 

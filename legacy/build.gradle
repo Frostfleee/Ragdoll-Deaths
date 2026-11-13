@@ -1,0 +1,148 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+}
+
+// The Fabric and Quilt jars for Minecraft 1.21.x. That game is obfuscated, so this build maps it to Mojang's names
+// with the remapping Loom; 26.x is built by the root build. The sources are the same ones in ../src: the shared
+// code, then the code for this game-version band (src/<compat>), which replaces what moved between versions.
+// Run it with ./gradlew -p legacy build -Pminecraft_version=... -Pcompat=... from the project root.
+def src = rootDir.toPath().resolve('../src').normalize().toFile()
+def compat = project.compat
+def loader = project.findProperty('loader') ?: 'fabric'
+
+// Build outside OneDrive, whose sync locks files under build/ mid-build.
+layout.buildDirectory = file("${System.getenv('LOCALAPPDATA')}/ragdolldeaths-build/legacy-${loader}-${compat}")
+
+sourceSets {
+	main {
+		java {
+			srcDirs = ["$src/main/java", "$src/$compat/java", "$src/fabric/java", "$src/fabric_$compat/java", "$src/forgelike_$compat/java"]
+		}
+		resources {
+			srcDirs = ["$src/main/resources", "$src/$loader/resources", "$src/forgelike/resources"]
+		}
+	}
+}
+
+// ./gradlew -p legacy runClientGameTest -PvisualTests runs the same visual test as the root build, on 1.21.x.
+if (project.hasProperty('visualTests')) {
+	fabricApi {
+		configureTests {
+			createSourceSet = true
+			modId = 'ragdolldeaths-visual-tests'
+			enableGameTests = false
+			enableClientGameTests = true
+			eula = true
+		}
+	}
+	sourceSets.gametest.java.srcDirs = ["$src/gametest/java", "$src/gametest_$compat/java"]
+	sourceSets.gametest.resources.srcDirs = ["$src/gametest/resources"]
+}
+
+// ./gradlew -p legacy runClient starts the game with the mod, for checking it loads; Mixin lists what it changes.
+loom {
+	runs {
+		client {
+			vmArg '-Dmixin.debug.verbose=true'
+			// -Pselftest makes the game create a world, kill some mobs and the player, log SELFTEST lines and quit (see SelfTest).
+			if (project.hasProperty('selftest')) {
+				vmArg '-Dragdolldeaths.selftest=true'
+			}
+			if (project.hasProperty('quiltRun')) {
+				// Quilt reads its own names for Loom's development flags; without them it loads no mods from the classpath.
+				vmArg '-Dloader.development=true'
+				vmArg '-Dloader.disable_forked_guis=true' // a crash ends the run instead of waiting in a window
+				vmArg "-Dloader.remapClasspathFile=${file('.gradle/loom-cache/remapClasspath.txt')}"
+			}
+		}
+	}
+}
+
+version = "${project.mod_version}+${project.minecraft_range_name}"
+group = project.maven_group
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = 'Quilt'
+		url = 'https://maven.quiltmc.org/repository/release/'
+		content {
+			includeGroup 'org.quiltmc'
+		}
+	}
+	maven {
+		name = 'TerraformersMC'
+		url = 'https://maven.terraformersmc.com/releases/'
+		content {
+			includeGroup 'com.terraformersmc'
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	if (loader == 'quilt' && project.hasProperty('quiltRun')) {
+		// -PquiltRun: runClient starts the game on the Quilt loader itself, which also provides Fabric's loader API.
+		modImplementation "org.quiltmc:quilt-loader:${project.findProperty('quilt_loader_version') ?: '0.30.2'}"
+		// what Quilt's launcher manifest (quilt-loader-<version>.json) lists; its Maven metadata names none of it
+		implementation 'net.fabricmc:sponge-mixin:0.17.4+mixin.0.8.7'
+		implementation 'io.github.llamalad7:mixinextras-fabric:0.5.5'
+		implementation 'org.quiltmc:quilt-json5:1.0.4+final'
+		implementation 'org.quiltmc:quilt-config:1.3.3'
+	} else {
+		modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	}
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	modCompileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") {
+		transitive = false
+	}
+}
+
+processResources {
+	// Quilt reads ">=1.21.2 <1.21.5" as one bound; it takes the two bounds as {"all": [">=1.21.2", "<1.21.5"]}.
+	def quiltMinecraftRange = '{ "all": [' + project.minecraft_range.split(' ').collect { '"' + it + '"' }.join(', ') + '] }'
+	def props = [version: project.version, minecraftRange: project.minecraft_range, quiltMinecraftRange: quiltMinecraftRange]
+	inputs.properties props
+	// the mixin list depends on the game version; bump filterRevision when editing the filters below
+	inputs.property 'compat', compat
+	// Gradle does not see edits to the filters below: bump this when changing them, so the resources are rebuilt.
+	inputs.property 'filterRevision', 4
+	filesMatching(["fabric.mod.json", "quilt.mod.json"]) {
+		expand props
+		// 1.21.x runs on Java 21, and adds ghost bodies with a mixin of its own.
+		filter { it.replace('">=25"', '">=21"') }
+		filter { it.replace('"config": "ragdolldeaths.mixins.json",', '"config": "ragdolldeaths.mixins.json", "environment": "client" }, { "config": "ragdolldeaths.ghosts.mixins.json",') }
+		filter { it.replace('"mixin": "ragdolldeaths.mixins.json",', '"mixin": ["ragdolldeaths.mixins.json", "ragdolldeaths.ghosts.mixins.json"],') }
+		// The jar is mapped to Fabric's intermediary names; Quilt assumes its own hashed names unless told, and refuses it.
+		filter { it.replace('"group": "com.frostfleee",', '"group": "com.frostfleee", "intermediate_mappings": "net.fabricmc:intermediary",') }
+	}
+	filesMatching('ragdolldeaths.mixins.json') {
+		filter { it.replace('JAVA_25', 'JAVA_21') }
+		// 1.21 and 1.21.1 have no render states: their hooks make the mod's own stand-ins instead (src/mc1_21_0).
+		if (compat == 'mc1_21_0') {
+			filter { it.replace('"EntityRendererMixin",', '"ModelBakeMixin", "ModelRootMixin", "AgeableListModelAccessor", "CubeAccessor", "SlimeSquishMixin",').replace('"LivingEntityRendererAccessor",', '"LivingEntityRendererFlipAccessor",') }
+			filter { it.replace('"EntityRenderStateMixin",', '') }
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	toolchain.languageVersion = JavaLanguageVersion.of(21)
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	from("$src/../LICENSE") {
+		rename { "${it}_ragdolldeaths" }
+	}
+}

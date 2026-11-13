@@ -3,13 +3,17 @@
 	"package": "com.frostfleee.ragdolldeaths.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"CameraMixin",
+		"CreateWorldScreenAccessor",
 		"ClientPacketListenerMixin",
 		"EntityRenderDispatcherMixin",
+		"EntityCullingMixin",
 		"EntityRendererMixin",
 		"EntityRenderStateMixin",
 		"LivingEntityMixin",
 		"LivingEntityRendererAccessor",
 		"LivingEntityRendererMixin",
+		"MinecraftMixin",
 		"ModelFeatureRendererMixin",
 		"ModelPartAccessor"
 	],

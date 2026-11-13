@@ -14,7 +14,6 @@ import com.frostfleee.ragdolldeaths.core.WaterBehavior;
 import net.minecraft.client.renderer.entity.state.GuardianRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ClipContext;
@@ -97,8 +96,7 @@ final class ActiveRagdoll {
 		if (!config.physicsRagdolls || entity.isPassenger()) {
 			return false;
 		}
-		// A shulker breaks like the box it is, in the box's own particles.
-		return profile.kind() != BodyKind.SHULKER;
+		return true;
 	}
 
 	boolean isPhysical() {
@@ -226,7 +224,7 @@ final class ActiveRagdoll {
 
 	private static JointRig rigOf(LivingEntity entity) {
 		var renderer = net.minecraft.client.Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
-		return renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer<?, ?, ?> living ? JointRig.of(living.getModel().root()) : null;
+		return renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer living ? JointRig.of(Compat.root(living.getModel())) : null;
 	}
 
 	/** The body has touched the ground or a fluid: its landing death starts, fitted to the ground it lies on. */
@@ -285,8 +283,8 @@ final class ActiveRagdoll {
 			pose.offsetX += anchor.x - state.x;
 			pose.offsetY += anchor.y - state.y;
 			pose.offsetZ += anchor.z - state.z;
-			state.shadowPieces.clear();
-			state.lightCoords = lightAt(entity.level(), state.x + pose.offsetX, state.y + pose.offsetY + profile.height() / 2.0, state.z + pose.offsetZ);
+			Compat.hideShadow(state);
+			Compat.setLight(state, lightAt(entity.level(), state.x + pose.offsetX, state.y + pose.offsetY + profile.height() / 2.0, state.z + pose.offsetZ));
 		}
 
 		if (config.hideDeathTint) {
@@ -316,8 +314,8 @@ final class ActiveRagdoll {
 			pose.offsetX = torso.x - state.x;
 			pose.offsetY = torso.y - profile.height() / 2.0 - state.y;
 			pose.offsetZ = torso.z - state.z;
-			state.shadowPieces.clear();
-			state.lightCoords = lightAt(entity.level(), torso.x, torso.y, torso.z);
+			Compat.hideShadow(state);
+			Compat.setLight(state, lightAt(entity.level(), torso.x, torso.y, torso.z));
 			lastPose.copyFrom(pose);
 			lastFeet = new Vec3(state.x, state.y, state.z);
 		}
@@ -326,7 +324,7 @@ final class ActiveRagdoll {
 		}
 		if (physics.charredWhole()) {
 			// Unlit as well as tinted: armor, clothes and other layers take the light but not the tint.
-			state.lightCoords = 0;
+			Compat.setLight(state, 0);
 			state.hasRedOverlay = false;
 		}
 		RagdollRenderData.set(state, pose, null);
@@ -335,16 +333,21 @@ final class ActiveRagdoll {
 
 	/**
 	 * Called once when the body disappears: leaves the death puff where the body last lay, as drawn. A body that was
-	 * never drawn puffs where the entity stands. Shulkers already broke apart into shulker box particles.
+	 * never drawn puffs where the entity stands. A shulker breaks like a shulker box of its color instead, and one
+	 * that is not a physics body already broke when it died.
 	 */
 	void vanish() {
-		if (vanished || profile.kind() == BodyKind.SHULKER) {
+		if (vanished || profile.kind() == BodyKind.SHULKER && !isPhysical()) {
 			return;
 		}
 		vanished = true;
 		if (physics != null && physics.built()) {
 			Vec3 torso = physics.torsoPosition(1.0F);
 			PhysicsHost.INSTANCE.remove(physics);
+			if (entity instanceof net.minecraft.world.entity.monster.Shulker shulker) {
+				RagdollTracker.breakShell(shulker, torso);
+				return;
+			}
 			DeathParticles.spawn(entity.level(), torso.subtract(0.0, 0.25, 0.0), new RagdollPose(), profile.height() * 0.4, 0.5, entity.getRandom());
 			return;
 		}
@@ -380,14 +383,27 @@ final class ActiveRagdoll {
 		state.ageInTicks = (float) (idleBase + idle);
 	}
 
+	/** Where this body's head is on the frame being drawn, or null while it has no physics body. */
+	net.minecraft.world.phys.Vec3 physicsHead(float partialTicks) {
+		return physics != null && physics.built() && !physics.failed ? physics.headPosition(partialTicks) : null;
+	}
+
 	boolean isFinished(RagdollConfig config, long currentTick) {
+		boolean untilRespawn = keptUntilRespawn(config);
+		if (untilRespawn && respawned()) {
+			return true;
+		}
 		if (physics != null && (physics.built() || !physics.failed)) {
+			boolean expired = !untilRespawn && age(currentTick, 0.0F) >= config.bodyLifetimeTicks;
 			// With Sink in Lava on, a body in lava goes under and is gone sooner.
-			if (physics.failed || physics.retired || age(currentTick, 0.0F) >= config.bodyLifetimeTicks || config.lavaSink && physics.lavaTicks > LAVA_GONE_TICKS) {
+			if (physics.failed || physics.retired || expired || config.lavaSink && physics.lavaTicks > LAVA_GONE_TICKS) {
 				return true;
 			}
 			// A body whose chunk was unloaded has no ground left under it.
 			return physics.built() && !entity.level().isLoaded(BlockPos.containing(physics.torsoPosition(1.0F)));
+		}
+		if (untilRespawn) {
+			return false;
 		}
 		double end = RagdollAnimator.endTick(profile, config);
 		if (ghostFloorDrop > 0.0) {
@@ -395,6 +411,20 @@ final class ActiveRagdoll {
 			end = Math.max(end, Math.min(config.ghostMaxTicks, landed));
 		}
 		return age(currentTick, 0.0F) >= end;
+	}
+
+	/** With Player Body Until Respawn on, a player's body has no lifetime: it goes when they respawn. */
+	boolean keptUntilRespawn(RagdollConfig config) {
+		return config.playerBodyUntilRespawn && entity instanceof net.minecraft.world.entity.player.Player;
+	}
+
+	/**
+	 * Whether the player this body belongs to is back: a dead player stays the same entity until they respawn, when the
+	 * game swaps in a new, living one with the same id.
+	 */
+	private boolean respawned() {
+		net.minecraft.world.entity.player.Player now = entity.level().getPlayerByUUID(entity.getUUID());
+		return now != null && now != entity && !now.isDeadOrDying();
 	}
 
 	/**
@@ -485,6 +515,6 @@ final class ActiveRagdoll {
 		BlockPos above = pos.above();
 		int block = Math.max(level.getBrightness(LightLayer.BLOCK, pos), level.getBrightness(LightLayer.BLOCK, above));
 		int sky = Math.max(level.getBrightness(LightLayer.SKY, pos), level.getBrightness(LightLayer.SKY, above));
-		return LightCoordsUtil.pack(block, sky);
+		return Compat.packLight(block, sky);
 	}
 }

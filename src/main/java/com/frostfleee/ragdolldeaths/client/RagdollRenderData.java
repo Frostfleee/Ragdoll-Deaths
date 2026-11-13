@@ -22,7 +22,7 @@ public final class RagdollRenderData {
 	}
 
 	/** The physics ragdoll this state is drawn from, or null. */
-	static PhysicsRagdoll physics(EntityRenderState state) {
+	public static PhysicsRagdoll physics(EntityRenderState state) {
 		return (PhysicsRagdoll) ((Holder) state).ragdolldeaths$physics();
 	}
 
@@ -33,13 +33,14 @@ public final class RagdollRenderData {
 	}
 
 	/** The texture to draw the state with: the body's own burnt copy when it has one. Also notes the mob's texture. */
-	public static net.minecraft.resources.Identifier texture(EntityRenderState state, net.minecraft.resources.Identifier base) {
+	@SuppressWarnings("unchecked")
+	public static <T> T texture(EntityRenderState state, T base) {
 		PhysicsRagdoll ragdoll = physics(state);
 		if (ragdoll == null) {
 			return base;
 		}
 		ragdoll.baseTexture = base;
-		return ragdoll.scorch != null ? ragdoll.scorch.id : base;
+		return ragdoll.scorch != null ? (T) ragdoll.scorch.id : base;
 	}
 
 	static void setPhysics(EntityRenderState state, PhysicsRagdoll ragdoll) {
@@ -56,5 +57,27 @@ public final class RagdollRenderData {
 		Object ragdolldeaths$physics();
 
 		void ragdolldeaths$setPhysics(Object ragdoll);
+
+		/** The light to draw the body with, or -1 for the entity's own; for versions whose state has no light. */
+		int ragdolldeaths$light();
+
+		void ragdolldeaths$setLight(int light);
+	}
+
+	/** Forgets everything about the last body this state was filled for: some versions reuse one state per renderer. */
+	public static void clear(EntityRenderState state) {
+		set(state, null, null);
+		setPhysics(state, null);
+		((Holder) state).ragdolldeaths$setLight(-1);
+	}
+
+	/** The light to draw the state with: the body's own when it set one, else the light the game passes. */
+	public static int light(EntityRenderState state, int light) {
+		int own = ((Holder) state).ragdolldeaths$light();
+		return own >= 0 ? own : light;
+	}
+
+	static void setLight(EntityRenderState state, int light) {
+		((Holder) state).ragdolldeaths$setLight(light);
 	}
 }

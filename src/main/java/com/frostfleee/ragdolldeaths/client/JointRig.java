@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
 
 /** Maps a model's named parts to joint roles and caches the result per model. */
 final class JointRig {
@@ -72,9 +71,9 @@ final class JointRig {
 		children.forEach((name, part) -> {
 			String[] tokens = JointNames.tokens(name);
 			JointRole role = JointNames.roleOf(tokens);
-			float childX = parentX + part.getInitialPose().x();
-			float childY = parentY + part.getInitialPose().y();
-			float childZ = parentZ + part.getInitialPose().z();
+			float childX = parentX + Rest.of(part).x();
+			float childY = parentY + Rest.of(part).y();
+			float childZ = parentZ + Rest.of(part).z();
 			if (role == null || !allowedInside(container, role)) {
 				unassigned.add(part);
 				collect(part, joints, counts, container, childX, childY, childZ);
@@ -107,9 +106,9 @@ final class JointRig {
 	/** Parts that share a joint's pivot (a chicken's beak and wattle beside its head) move with that joint. */
 	private static void adoptCoPivoted(List<ModelPart> unassigned, List<Joint> assigned, List<Joint> joints, Map<JointRole, Integer> counts) {
 		for (ModelPart part : unassigned) {
-			PartPose pose = part.getInitialPose();
+			Rest pose = Rest.of(part);
 			for (Joint joint : assigned) {
-				PartPose other = joint.part().getInitialPose();
+				Rest other = Rest.of(joint.part());
 				if (joint.role() != JointRole.EYE && samePivot(pose, other) && sameRotation(pose, other)) {
 					float[] reach = reach(part);
 					joints.add(new Joint(part, joint.role(), joint.side(), joint.index(), joint.outwardX(), joint.outwardZ(), joint.groundY(), reach[0], reach[1],
@@ -122,7 +121,7 @@ final class JointRig {
 
 	private static Joint joint(ModelPart part, JointRole role, Side side, Map<JointRole, Integer> counts, float groundY, float pivotX, float pivotY, float pivotZ) {
 		int index = counts.merge(role, 1, Integer::sum) - 1;
-		PartPose pose = part.getInitialPose();
+		Rest pose = Rest.of(part);
 		float length = (float) Math.hypot(pose.x(), pose.z());
 		float outwardX = length > PIVOT_EPSILON ? pose.x() / length : 0.0F;
 		float outwardZ = length > PIVOT_EPSILON ? pose.z() / length : 1.0F;
@@ -146,7 +145,7 @@ final class JointRig {
 	private static Rig classify(List<Joint> joints) {
 		List<JointNames.Limb> limbs = new ArrayList<>(joints.size());
 		for (Joint joint : joints) {
-			limbs.add(new JointNames.Limb(joint.role(), joint.side(), joint.part().getInitialPose().zRot()));
+			limbs.add(new JointNames.Limb(joint.role(), joint.side(), Rest.of(joint.part()).zRot()));
 		}
 		return JointNames.classify(limbs);
 	}
@@ -182,7 +181,7 @@ final class JointRig {
 		float half = 0.0F;
 		for (Joint joint : joints) {
 			if (joint.role() == JointRole.BODY) {
-				float x = joint.part().getInitialPose().x();
+				float x = Rest.of(joint.part()).x();
 				for (ModelPart.Cube cube : ((ModelPartAccessor) (Object) joint.part()).ragdolldeaths$cubes()) {
 					half = Math.max(half, Math.max(Math.abs(x + cube.minX), Math.abs(x + cube.maxX)));
 				}
@@ -197,15 +196,15 @@ final class JointRig {
 			bounds[1] = Math.max(bounds[1], offsetY + cube.maxY);
 		}
 		for (ModelPart child : ((ModelPartAccessor) (Object) part).ragdolldeaths$children().values()) {
-			verticalBounds(child, offsetY + child.getInitialPose().y(), bounds);
+			verticalBounds(child, offsetY + Rest.of(child).y(), bounds);
 		}
 	}
 
-	private static boolean samePivot(PartPose a, PartPose b) {
+	private static boolean samePivot(Rest a, Rest b) {
 		return Math.abs(a.x() - b.x()) < PIVOT_EPSILON && Math.abs(a.y() - b.y()) < PIVOT_EPSILON && Math.abs(a.z() - b.z()) < PIVOT_EPSILON;
 	}
 
-	private static boolean sameRotation(PartPose a, PartPose b) {
+	private static boolean sameRotation(Rest a, Rest b) {
 		return Math.abs(a.xRot() - b.xRot()) < PIVOT_EPSILON && Math.abs(a.yRot() - b.yRot()) < PIVOT_EPSILON && Math.abs(a.zRot() - b.zRot()) < PIVOT_EPSILON;
 	}
 }

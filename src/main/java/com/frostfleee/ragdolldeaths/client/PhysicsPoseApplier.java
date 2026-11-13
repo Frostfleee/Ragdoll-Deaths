@@ -3,7 +3,6 @@ package com.frostfleee.ragdolldeaths.client;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
-import net.minecraft.client.renderer.state.level.CameraRenderState;
 import org.joml.Matrix4f;
 
 /**
@@ -12,29 +11,38 @@ import org.joml.Matrix4f;
  * pose; from then on the model's parts are moved onto the simulated bodies.
  */
 public final class PhysicsPoseApplier {
+	/**
+	 * The render state of the ragdoll mob being drawn right now, for game versions that pose each model as it is
+	 * drawn (1.21.2 to 1.21.8); null otherwise. Drawing runs on one thread.
+	 */
+	public static Object drawing;
+
+	/** How many times a model was posed onto a physics body; the self-test reports it to show bodies are drawn. */
+	public static long writes;
+
 	private PhysicsPoseApplier() {
 	}
 
 	/** Notes, before anything of this mob is drawn this frame, which model is its own and where the camera is. */
-	public static void begin(LivingEntityRenderer<?, ?, ?> renderer, EntityRenderState state, CameraRenderState camera) {
+	public static void begin(LivingEntityRenderer renderer, EntityRenderState state, net.minecraft.world.phys.Vec3 camera) {
 		PhysicsRagdoll ragdoll = RagdollRenderData.physics(state);
 		if (ragdoll == null) {
 			return;
 		}
 		ragdoll.mainModel = renderer.getModel();
-		ragdoll.camX = camera.pos.x;
-		ragdoll.camY = camera.pos.y;
-		ragdoll.camZ = camera.pos.z;
+		ragdoll.camX = camera.x;
+		ragdoll.camY = camera.y;
+		ragdoll.camZ = camera.z;
 	}
 
 	/**
 	 * @param pose the matrix the model is drawn with
 	 * @return true when the state belongs to a physics ragdoll, so the classic joint animation must not run
 	 */
-	public static boolean apply(Model<?> model, Object state, Matrix4f pose) {
+	public static boolean apply(Model model, Object state, Matrix4f pose) {
 		// A model that has knees and elbows for ragdolls is drawn with whole limbs for everything else.
-		LimbSplitter.rest(model.root());
-		PhysicsRagdoll.showHidden(model.root());
+		LimbSplitter.rest(Compat.root(model));
+		PhysicsRagdoll.showHidden(Compat.root(model));
 		if (!(state instanceof EntityRenderState renderState)) {
 			return false;
 		}
@@ -53,6 +61,7 @@ public final class PhysicsPoseApplier {
 				return true;
 			}
 			ragdoll.write(model, pose);
+			writes++;
 			return true;
 		} catch (RuntimeException e) {
 			ragdoll.failed = true;

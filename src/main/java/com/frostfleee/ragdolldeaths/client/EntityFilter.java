@@ -2,13 +2,11 @@ package com.frostfleee.ragdolldeaths.client;
 
 import com.frostfleee.ragdolldeaths.core.RagdollConfig;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.monster.creaking.Creaking;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
@@ -53,7 +51,7 @@ final class EntityFilter {
 		return entity instanceof EnderDragon
 				|| entity instanceof WitherBoss
 				|| entity instanceof ArmorStand
-				|| entity instanceof Creaking
-				|| entity instanceof Avatar && !(entity instanceof Player);
+				|| Mobs.isCreaking(entity)
+				|| Mobs.isMannequin(entity);
 	}
 }

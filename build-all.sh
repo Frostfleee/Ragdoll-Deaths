@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds every release jar: one per loader and game-version group, into
-# <Desktop>/Ragdoll Deaths/Builds/<Loader>/Ragdoll Deaths v<version> - <Loader> <versions>.jar.
+# <Desktop>/Ragdoll Deaths/Builds/<Loader>/<mod version>/Ragdoll Deaths v<version> - <Loader> <versions>.jar.
 # A whole patch line is labelled like 26.1.x; a span across minor versions like 26.2-26.3.
 #
 # A group shares one jar when the mod compiles to identical bytecode against each version in it and every mixin
@@ -25,8 +25,9 @@ gradle() {
 		if ./gradlew "$@" > build-all.log 2>&1; then
 			return 0
 		fi
-		grep -q "clean up\|stale\|being used by another process" build-all.log || { cat build-all.log; return 1; }
-		rm -rf build/classes build/resources build/test-results
+		grep -q "clean up\|stale\|being used by another process\|Unable to delete" build-all.log || { cat build-all.log; return 1; }
+		rm -rf build/classes build/resources build/test-results build/reports build/generated 2> /dev/null || true
+		sleep 3
 	done
 	cat build-all.log
 	return 1
@@ -34,8 +35,8 @@ gradle() {
 
 ship() { # ship <built jar> <loader name> <version label>
 	local name="Ragdoll Deaths v$VERSION - $2 $3.jar"
-	mkdir -p "$OUT/$2"
-	cp "$1" "$OUT/$2/$name"
+	mkdir -p "$OUT/$2/$VERSION"
+	cp "$1" "$OUT/$2/$VERSION/$name"
 	echo "  $name"
 }
 

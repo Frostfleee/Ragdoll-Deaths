@@ -183,7 +183,7 @@ public final class RagdollTracker {
 		java.util.List<LivingEntity> out = new java.util.ArrayList<>();
 		RagdollConfig config = ConfigStore.get();
 		for (ActiveRagdoll ghost : ghosts.values()) {
-			if (ghost.entity.level() == drawnLevel && EntityFilter.withinRenderDistance(ghost.entity.position(), config)) {
+			if (ghost.entity.level() == drawnLevel && EntityFilter.withinRenderDistance(ghost.drawnPosition(), config)) {
 				out.add(ghost.entity);
 			}
 		}
@@ -198,6 +198,26 @@ public final class RagdollTracker {
 	private static boolean keepsDeadPlayer(ActiveRagdoll ragdoll) {
 		return !ragdoll.keptAsGhost() && ragdoll.entity instanceof net.minecraft.world.entity.player.Player && ragdoll.entity.isDeadOrDying()
 				&& (ragdoll.isPhysical() || ragdoll.keptUntilRespawn(ConfigStore.get()));
+	}
+
+	/** Whether the entity is being drawn as a ragdoll right now (an animated or physics body, alive or as a ghost). */
+	public boolean hasBody(LivingEntity entity) {
+		return entity.deathTime > 0 && find(entity) != null;
+	}
+
+	/** Whether the entity with this UUID is being drawn as a ragdoll right now. */
+	public boolean hasBody(java.util.UUID uuid) {
+		for (ActiveRagdoll ragdoll : active.values()) {
+			if (ragdoll.entity.getUUID().equals(uuid)) {
+				return true;
+			}
+		}
+		for (ActiveRagdoll ghost : ghosts.values()) {
+			if (ghost.entity.getUUID().equals(uuid)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** For the self-test: what the tracker holds for an entity. */
@@ -221,7 +241,7 @@ public final class RagdollTracker {
 		Iterator<ActiveRagdoll> iterator = ghosts.values().iterator();
 		while (iterator.hasNext()) {
 			ActiveRagdoll ghost = iterator.next();
-			if (ghost.entity.level() != extractedLevel || !EntityFilter.withinRenderDistance(ghost.entity.position(), config)) {
+			if (ghost.entity.level() != extractedLevel || !EntityFilter.withinRenderDistance(ghost.drawnPosition(), config)) {
 				continue;
 			}
 			try {
@@ -238,7 +258,8 @@ public final class RagdollTracker {
 
 	/** The box a living entity's ragdoll is culled by while it is being animated, or null to use its hitbox. */
 	public AABB renderBounds(LivingEntity entity) {
-		ActiveRagdoll ragdoll = active.get(entity.getId());
+		// A ghost (a removed mob whose body lingers) counts too: on 1.21.x it is culled like any entity.
+		ActiveRagdoll ragdoll = entity.isRemoved() ? ghosts.get(entity) : active.get(entity.getId());
 		return ragdoll == null || ragdoll.entity != entity ? null : ragdoll.renderBounds();
 	}
 

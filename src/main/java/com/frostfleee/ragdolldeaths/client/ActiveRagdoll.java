@@ -456,6 +456,15 @@ final class ActiveRagdoll {
 	 * Where the body was last drawn, padded by its own size and a little travel. Rendering is culled by this box
 	 * instead of the entity's hitbox, which a pushed, falling or thrown body can leave far behind.
 	 */
+	/**
+	 * Where the body is drawn: it can lie far from where the mob died (thrown, carried by water), and is kept or culled
+	 * by distance from here.
+	 */
+	Vec3 drawnPosition() {
+		AABB bounds = renderBounds();
+		return bounds != null ? bounds.getCenter() : entity.position();
+	}
+
 	AABB renderBounds() {
 		if (physics != null && physics.built()) {
 			return physics.bounds();

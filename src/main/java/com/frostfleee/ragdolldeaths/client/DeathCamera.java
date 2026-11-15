@@ -8,13 +8,11 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The death camera: while you are dead, the view follows your own body's head from a few blocks away and slowly
- * circles it, so you watch yourself fall and come to rest. It starts behind where you were facing, keeps out of
+ * The death camera: while you are dead, the view follows your own body's head from a few blocks away (Death Camera
+ * Distance) and slowly circles it (Death Camera Circling), so you watch yourself fall and come to rest. It starts behind where you were facing, keeps out of
  * walls, and hands the view back when you respawn.
  */
 public final class DeathCamera {
-	/** How far the camera stays from the head, in blocks, when nothing is in the way. */
-	private static final double DISTANCE = 3.5;
 	/** How far it looks down at the head, in degrees. */
 	private static final float PITCH = 28.0F;
 	/** How fast it circles, in degrees per tick: a full turn takes about thirty seconds. */
@@ -46,11 +44,12 @@ public final class DeathCamera {
 			startTick = now;
 			startYaw = player.getYRot();
 		}
-		float yaw = startYaw + (now - startTick + partialTicks) * TURN_PER_TICK;
+		// Death Camera Distance and Circling are settings; without circling it holds the angle it started from.
+		float yaw = startYaw + (config.deathCameraCircles ? (now - startTick + partialTicks) * TURN_PER_TICK : 0.0F);
 		double yawRad = Math.toRadians(yaw), pitchRad = Math.toRadians(PITCH);
 		// The way the camera looks; it sits that far back from the head along it.
 		Vec3 look = new Vec3(-Math.sin(yawRad) * Math.cos(pitchRad), -Math.sin(pitchRad), Math.cos(yawRad) * Math.cos(pitchRad));
-		Vec3 wanted = head.subtract(look.scale(DISTANCE));
+		Vec3 wanted = head.subtract(look.scale(config.deathCameraDistance));
 		HitResult hit = player.level().clip(new ClipContext(head, wanted, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, player));
 		Vec3 at = wanted;
 		if (hit.getType() != HitResult.Type.MISS) {

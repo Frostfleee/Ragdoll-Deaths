@@ -205,6 +205,23 @@ final class PhysicsRagdoll {
 		}
 	}
 
+	/** For the self-test only: moves the whole body, as if it had been carried there, with the poses it is drawn from. */
+	void moveForTest(double dx, double dy, double dz) {
+		for (Body b : bodies) {
+			b.x += dx;
+			b.y += dy;
+			b.z += dz;
+		}
+		for (double[] f : frames) {
+			for (int k = 0; k + 2 < f.length; k += 7) {
+				f[k] += dx;
+				f[k + 1] += dy;
+				f[k + 2] += dz;
+			}
+		}
+		island.asleep = false;
+	}
+
 	/** Records every body's pose after the given physics step of this tick (1 to {@link #STEPS_PER_TICK}). */
 	void capture(int step) {
 		double[] f = frames[step];

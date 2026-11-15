@@ -67,6 +67,9 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				toggle("impactSounds", c.impactSounds, v -> c.impactSounds = v),
 				toggle("impactParticles", c.impactParticles, v -> c.impactParticles = v),
 				toggle("deathCamera", c.deathCamera, v -> c.deathCamera = v),
+				slider("deathCameraDistance", 3, 20, (int) Math.round(c.deathCameraDistance * 2.0),
+						v -> Component.translatable(KEY + "blocks", String.format(Locale.ROOT, "%.1f", v / 2.0)), v -> c.deathCameraDistance = v / 2.0),
+				toggle("deathCameraCircles", c.deathCameraCircles, v -> c.deathCameraCircles = v),
 				toggle("playerBodyUntilRespawn", c.playerBodyUntilRespawn, v -> c.playerBodyUntilRespawn = v),
 				slider("bodyLifetimeTicks", 1, RagdollConfig.MAX_BODY_LIFETIME_TICKS / 20, c.bodyLifetimeTicks / 20,
 						v -> Component.translatable(KEY + "wholeSeconds", v), v -> c.bodyLifetimeTicks = v * 20));

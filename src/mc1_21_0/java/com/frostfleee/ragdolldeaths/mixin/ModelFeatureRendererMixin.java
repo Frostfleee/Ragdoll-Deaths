@@ -2,6 +2,7 @@ package com.frostfleee.ragdolldeaths.mixin;
 
 import com.frostfleee.ragdolldeaths.client.JointApplier;
 import com.frostfleee.ragdolldeaths.client.PhysicsPoseApplier;
+import com.frostfleee.ragdolldeaths.client.PoseKeeper;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.Model;
@@ -28,6 +29,7 @@ abstract class ModelFeatureRendererMixin {
 			return;
 		}
 		Model model = (Model) (Object) this;
+		PoseKeeper.remember(model);
 		if (!PhysicsPoseApplier.apply(model, state, poseStack.last().pose())) {
 			JointApplier.apply(model, state);
 		}

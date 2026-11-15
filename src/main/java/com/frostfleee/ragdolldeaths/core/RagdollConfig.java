@@ -72,6 +72,10 @@ public final class RagdollConfig {
 	public boolean impactParticles = true;
 	/** When you die, the view switches to third person so you see your own body fall; it switches back when you respawn. */
 	public boolean deathCamera = false;
+	/** How far the death camera stays from your body's head, in blocks (closer when a wall is in the way). */
+	public double deathCameraDistance = 3.5;
+	/** Whether the death camera slowly circles your body; off, it holds the angle it started from. */
+	public boolean deathCameraCircles = true;
 	/** A player's body stays until that player respawns, instead of going after the body lifetime. */
 	public boolean playerBodyUntilRespawn = true;
 	/** Arms thrown out in a forward fall, chin tucked in a backward one. */
@@ -114,6 +118,7 @@ public final class RagdollConfig {
 		maxBodies = Math.clamp(maxBodies, 1, 256);
 		muscleSeconds = finiteOr(muscleSeconds, defaults.muscleSeconds, 0.0, 5.0);
 		explosionStrength = finiteOr(explosionStrength, defaults.explosionStrength, 0.0, 2.0);
+		deathCameraDistance = finiteOr(deathCameraDistance, defaults.deathCameraDistance, 1.5, 10.0);
 		if (physicsQuality == null) {
 			physicsQuality = defaults.physicsQuality;
 		}

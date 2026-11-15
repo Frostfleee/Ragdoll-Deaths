@@ -23,7 +23,7 @@ A small, client-side visual mod. When a mob dies, its body becomes a real physic
 
 ## Installation
 
-Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.1.1 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.1.1 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
+Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.1.2 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.1.2 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
 
 The mod is **client-only**. Servers don't need it, and every loader skips it on a dedicated server, so no rendering code ever loads server-side. In multiplayer, each player who installs it sees the ragdolls on their own screen.
 
@@ -185,6 +185,8 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | Impact Sounds | On | Thuds, splashes, bone clatter. |
 | Impact Dust | On | Block dust on hard landings, drops on splashes. |
 | Death Camera | Off | While you are dead, the view follows your body's head and slowly circles it. |
+| Death Camera Distance | 3.5 blocks | How far the death camera stays from your body. |
+| Death Camera Circling | On | Whether the death camera circles your body or holds its angle. |
 | Player Body Until Respawn | On | A player's body stays until they respawn, instead of going after the body lifetime. |
 
 ## Compatibility philosophy
@@ -198,6 +200,7 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
   - replacing vanilla's 90° death-flip angle only while a ragdoll is active,
   - skipping the vanilla death poof, only for bodies this mod is animating (the mod spawns its own where the body lay),
   - culling a body that's being animated by where it's drawn, not by its hitbox.
+- **Entity Model Features.** With EMF installed (the mod behind Fresh Animations, AL's packs and other "3D mobs" packs), a body keeps its pack's look: EMF's animations pause on a mob while it is a ragdoll, and the limbs are shaped from the vanilla parts EMF keeps behind the pack's model. EMF is optional and never required.
 - **Graceful fallback.** Mobs whose renderer isn't a standard living renderer (for example GeckoLib models) simply keep the vanilla death. If a renderer throws, ragdolls are turned off for that one entity type for the session, with a single log line, and vanilla takes over.
 
 ## Limitations
@@ -222,7 +225,7 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 ./build-all.sh
 ```
 
-This builds every jar, one per loader and game-version group, into `Desktop/Ragdoll Deaths/Builds/<Loader>/`. `./gradlew build` alone makes the Fabric jar for 26.2–26.3 in `build/libs/`, `./gradlew test` runs the unit tests, and `./gradlew runClient` starts a development client. `./gradlew -p legacy runClient -Pminecraft_version=… -Pcompat=…` does the same for 1.21.x (see `build-all.sh` for the values). `./selftest-all.sh all` checks every jar group in a real world (see TESTING.md).
+This builds every jar, one per loader and game-version group, into `Desktop/Ragdoll Deaths/Builds/<Loader>/<mod version>/`. `./gradlew build` alone makes the Fabric jar for 26.2–26.3 in `build/libs/`, `./gradlew test` runs the unit tests, and `./gradlew runClient` starts a development client. `./gradlew -p legacy runClient -Pminecraft_version=… -Pcompat=…` does the same for 1.21.x (see `build-all.sh` for the values). `./selftest-all.sh all` checks every jar group in a real world (see TESTING.md).
 
 How the sources are split:
 

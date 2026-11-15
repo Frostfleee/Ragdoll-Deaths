@@ -76,6 +76,7 @@ final class RagdollBuilder {
 		// Top-level parts that are not bodies themselves ride on the torso; anything inside them follows them.
 		List<String[]> riders = new ArrayList<>();
 		shellModel = ragdoll.entity instanceof net.minecraft.world.entity.monster.Shulker;
+		vanillaRoot = EmfCompat.vanillaRoot(root);
 		collect(root, root, new String[0], rootMatrix, null, true, pieces, riders);
 		Piece torso = null;
 		for (Piece piece : pieces) {
@@ -284,15 +285,20 @@ final class RagdollBuilder {
 			JointRole role = roleOf(name);
 			Matrix4f matrix = ModelMath.mul(new Matrix4f(parentSpace), part);
 			Piece piece = null;
+			// A resource pack's model (Entity Model Features): the limb is drawn from the pack's parts, but shaped and
+			// shown as the vanilla part at the same place (the pack's own parts can be anywhere, or the vanilla part
+			// hidden while they are drawn).
+			ModelPart vanilla = vanillaRoot == null ? null : vanillaPart(vanillaRoot, childPath);
+			boolean shown = vanilla != null ? vanilla.visible : part.visible;
 			// Both arms as one folded piece across the chest (a villager's, a witch's): that is part of the torso. On a
 			// joint of its own it swings into the body.
 			boolean foldedArms = role == JointRole.ARM && JointNames.sideOf(JointNames.tokens(name)) == com.frostfleee.ragdolldeaths.core.JointPose.Side.CENTER
 					&& Math.abs(Rest.of(part).x()) < 0.01F;
-			if (role != null && simulated(role) && !foldedArms && part.visible && allowedIn(container, role)) {
-				boolean bends = ConfigStore.get().kneesAndElbows && container == null && (role == JointRole.ARM || role == JointRole.LEG);
+			if (role != null && simulated(role) && !foldedArms && shown && allowedIn(container, role)) {
+				boolean bends = ConfigStore.get().kneesAndElbows && container == null && (role == JointRole.ARM || role == JointRole.LEG) && vanillaRoot == null;
 				float plane = bends ? LimbSplitter.planeOf(part) : Float.NaN;
 				LimbSplitter.Split split = Float.isNaN(plane) ? null : LimbSplitter.split(root, part, plane);
-				piece = measure(childPath, part, split == null ? part : split.upper(), role, matrix, Rest.of(part));
+				piece = measure(childPath, part, vanilla != null ? vanilla : split == null ? part : split.upper(), role, matrix, Rest.of(part));
 				if (piece != null) {
 					piece.parent = container;
 					piece.parentSpace = new Matrix4f(parentSpace);
@@ -316,6 +322,20 @@ final class RagdollBuilder {
 			// Inside a piece the parts follow it; inside a part that rides the torso, they follow that part.
 			collect(root, part, childPath, matrix, piece != null ? piece : container, false, pieces, riders);
 		}
+	}
+
+	/** The vanilla parts behind a resource pack's model being built (see EmfCompat), or null. Building runs on one thread. */
+	private static ModelPart vanillaRoot;
+
+	private static ModelPart vanillaPart(ModelPart root, String[] path) {
+		ModelPart part = root;
+		for (String name : path) {
+			part = ((ModelPartAccessor) (Object) part).ragdolldeaths$children().get(name);
+			if (part == null) {
+				return null;
+			}
+		}
+		return part;
 	}
 
 	/** Whether the model being built is a shulker's. Building runs on one thread. */
@@ -445,20 +465,20 @@ final class RagdollBuilder {
 
 	/** Measures the cubes of {@code shape} (the part itself, or the half of it that stands in for it). */
 	private static Piece measure(String[] path, ModelPart part, ModelPart shape, JointRole role, Matrix4f matrix, Rest rest) {
-		List<ModelPart.Cube> cubes = ((ModelPartAccessor) (Object) shape).ragdolldeaths$cubes();
-		if (cubes.isEmpty()) {
+		float[] box = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
+		for (ModelPart.Cube cube : ((ModelPartAccessor) (Object) shape).ragdolldeaths$cubes()) {
+			grow(box, cube.minX, cube.minY, cube.minZ);
+			grow(box, cube.maxX, cube.maxY, cube.maxZ);
+		}
+		if (box[0] > box[3]) {
+			// A resource pack's model (Entity Model Features) keeps the vanilla part empty and hangs its own parts,
+			// named EMF_..., under it: the limb's shape is theirs, where they sit under it.
+			packParts(shape, new Matrix4f(), box);
+		}
+		if (box[0] > box[3]) {
 			return null;
 		}
-		float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-		float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-		for (ModelPart.Cube cube : cubes) {
-			minX = Math.min(minX, cube.minX);
-			minY = Math.min(minY, cube.minY);
-			minZ = Math.min(minZ, cube.minZ);
-			maxX = Math.max(maxX, cube.maxX);
-			maxY = Math.max(maxY, cube.maxY);
-			maxZ = Math.max(maxZ, cube.maxZ);
-		}
+		float minX = box[0], minY = box[1], minZ = box[2], maxX = box[3], maxY = box[4], maxZ = box[5];
 		Piece piece = new Piece();
 		piece.path = path;
 		piece.part = part;
@@ -478,6 +498,35 @@ final class RagdollBuilder {
 		double density = role == JointRole.BODY ? 1.4 : 1.0;
 		piece.weight = density * piece.half.x * piece.half.y * piece.half.z;
 		return piece.weight > 0.0 ? piece : null;
+	}
+
+	private static void grow(float[] box, float x, float y, float z) {
+		box[0] = Math.min(box[0], x);
+		box[1] = Math.min(box[1], y);
+		box[2] = Math.min(box[2], z);
+		box[3] = Math.max(box[3], x);
+		box[4] = Math.max(box[4], y);
+		box[5] = Math.max(box[5], z);
+	}
+
+	/** Grows the box (in the part's pixels) by the visible cubes of the resource pack parts under the part. */
+	private static void packParts(ModelPart part, Matrix4f toPart, float[] box) {
+		for (var child : ((ModelPartAccessor) (Object) part).ragdolldeaths$children().entrySet()) {
+			ModelPart sub = child.getValue();
+			if (!child.getKey().startsWith("EMF_") || !sub.visible || sub.skipDraw) {
+				continue;
+			}
+			Matrix4f m = ModelMath.mul(new Matrix4f(toPart), sub);
+			Vector3f corner = new Vector3f();
+			for (ModelPart.Cube cube : ((ModelPartAccessor) (Object) sub).ragdolldeaths$cubes()) {
+				for (int i = 0; i < 8; i++) {
+					corner.set((i & 1) == 0 ? cube.minX : cube.maxX, (i & 2) == 0 ? cube.minY : cube.maxY, (i & 4) == 0 ? cube.minZ : cube.maxZ).div(16.0F);
+					m.transformPosition(corner).mul(16.0F);
+					grow(box, corner.x, corner.y, corner.z);
+				}
+			}
+			packParts(sub, m, box);
+		}
 	}
 
 	private static Body body(Piece piece, double mass, PhysicsRagdoll ragdoll, Vec3 velocity) {

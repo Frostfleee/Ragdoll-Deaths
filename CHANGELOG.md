@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.2
+
+### New
+- **Death Camera Distance and Death Camera Circling** (settings). How far the death camera stays from your body, from 1.5 to 10 blocks, and whether it slowly circles it or holds the angle it started from.
+- **Translations.** The settings screen is now also in Brazilian Portuguese, Spanish, German, French, Russian and Simplified Chinese.
+
+### Fixed
+- **Living mobs looked broken after one of their kind died** (1.21 and 1.21.1 only). Once a sheep, chicken or other mob was killed, the living ones of the same kind were drawn bent and twisted, with their bodies tipped over. On these versions every mob of a kind is drawn with one shared model, and the dead one's pose stayed on it; the model is now put back as it was each time a body has been drawn. ([#3](https://github.com/Frostfleee/Ragdoll-Deaths/issues/3))
+- **Resource packs made for Entity Model Features** (Fresh Animations, AL's packs and other "3D mobs" packs) no longer break the bodies. Bodies stood frozen in a T-pose or had their joints in the wrong places: EMF kept animating the pack's model over the body's pose, and the pack's models put the limbs' shapes in their own parts. Now EMF's animations pause on a mob while it is a ragdoll, and each limb is shaped from the vanilla part EMF keeps behind the pack's model, while the pack's model is what is drawn.
+- **A body far from where its mob died turned invisible.** Once a body had been thrown or carried about 70 to 80 blocks from its death spot (a little more or less by the mob's size), it vanished, though its dust, splashes and sounds went on. Whether to draw it was decided by where the mob died, both by the game's render distance and by Max Render Distance; it is now decided by where the body lies.
+
 ## 1.1.1
 
 ### New

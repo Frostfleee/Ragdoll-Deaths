@@ -15,6 +15,7 @@ public final class RagdollDeathsClient {
 	public static void init(Path configDirectory) {
 		ConfigStore.setDirectory(configDirectory);
 		ConfigStore.load();
+		EmfCompat.init();
 	}
 
 	/** Called when the client switches to another level, or leaves one. */

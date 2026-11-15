@@ -51,6 +51,8 @@ run forge 1.21.11 forge -Pcompat=mc1_21_11 -Pforge_version=1.21.11-61.2.5 '-Pmin
 
 # The oldest game version of the groups whose jar is built against a newer one ("edge" runs; same jars).
 if [ -n "${EDGES:-}" ]; then
+	run fabric 26.2-edge fabric26 -Pminecraft_version=26.2 -Pcompat=mc26_2 -Pfabric_api_version=0.161.0+26.2 -Pmodmenu_version=20.0.3 '-Pminecraft_range=>=26.2 <26.4' -Pminecraft_range_name=26.2-26.3
+	run neoforge 26.2-edge neoforge -Pminecraft_version=26.2 -Pcompat=mc26_2 -Pneo_version=26.2.0.93 '-Pminecraft_range=[26.2,26.4)'
 	run fabric 1.21-edge fabric -Pminecraft_version=1.21 -Pcompat=mc1_21_0 -Pfabric_api_version=0.102.0+1.21 -Pmodmenu_version=11.0.5 '-Pminecraft_range=>=1.21 <1.21.2' -Pminecraft_range_name=1.21-1.21.1
 	run neoforge 1.21-edge neoforge -Pminecraft_version=1.21 -Pcompat=mc1_21_0 -Pneo_version=21.0.167 '-Pminecraft_range=[1.21,1.21.2)' -Pjava_version=21
 	run forge 1.21-edge forge -Pcompat=mc1_21_0 -Pforge_version=1.21-51.0.33 '-Pminecraft_range=[1.21,1.21.2)' '-Pforge_range=[51,53)' -Pforge_bus=6 -Pbundle_mixinextras -Pjava_version=21

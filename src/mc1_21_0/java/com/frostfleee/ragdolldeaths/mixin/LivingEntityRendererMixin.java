@@ -3,6 +3,7 @@ package com.frostfleee.ragdolldeaths.mixin;
 import com.frostfleee.ragdolldeaths.client.Compat;
 import com.frostfleee.ragdolldeaths.client.JointApplier;
 import com.frostfleee.ragdolldeaths.client.PhysicsPoseApplier;
+import com.frostfleee.ragdolldeaths.client.PoseKeeper;
 import com.frostfleee.ragdolldeaths.client.RagdollRenderData;
 import com.frostfleee.ragdolldeaths.client.RagdollStates;
 import com.frostfleee.ragdolldeaths.client.RagdollTransforms;
@@ -90,6 +91,7 @@ abstract class LivingEntityRendererMixin {
 		}
 		// Layers that hang things on the model (held items, heads) read its parts right after this.
 		var model = ((LivingEntityRenderer) (Object) this).getModel();
+		PoseKeeper.remember(model);
 		if (!PhysicsPoseApplier.apply(model, state, poseStack.last().pose())) {
 			JointApplier.apply(model, state);
 		}
@@ -98,6 +100,8 @@ abstract class LivingEntityRendererMixin {
 	@Inject(method = RENDER, at = @At("TAIL"))
 	private void ragdolldeaths$doneDrawing(LivingEntity entity, float yaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffers, int light, CallbackInfo ci) {
 		PhysicsPoseApplier.drawing = null;
+		// The model is shared with the living mobs of this kind: they must not be drawn with the body's pose.
+		PoseKeeper.restore();
 	}
 
 	// The red death tint, unless turned off.

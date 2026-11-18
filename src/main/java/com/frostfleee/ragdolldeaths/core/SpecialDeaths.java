@@ -95,7 +95,7 @@ public final class SpecialDeaths {
 
 		double convulse = ring(t, 0.0, 0.3, 1.6 / k, 0.25 / k);
 		if (inWater) {
-			double bellyUp = Math.min(22.0 * k, config.lifetimeTicks * config.animationSpeed - 4.0);
+			double bellyUp = Math.min(22.0 * k, RagdollAnimator.animationTicks(config) * config.animationSpeed - 4.0);
 			pose.tipToward(p.fallDirX(), p.fallDirZ(), 0.2 * bell(t, 0.0, 5.0 * k));
 			pose.rollAngle = -side * (convulse + Math.PI * easeInOut(progress(t, Math.min(5.0 * k, bellyUp - 8.0), bellyUp)));
 			RagdollAnimator.applyPush(p, config, t, 8.0 * k, 0.4, pose);
@@ -258,7 +258,7 @@ public final class SpecialDeaths {
 	 * lies face down with its arms stretched out past its head. The phases stretch to fill the Warden's longer lifetime.
 	 */
 	private static void warden(DeathProfile p, RagdollConfig config, double t, RagdollPose pose, JointPose j) {
-		double duration = (config.lifetimeTicks + config.wardenExtraTicks) * config.animationSpeed;
+		double duration = (RagdollAnimator.animationTicks(config) + config.wardenExtraTicks) * config.animationSpeed;
 		double kneel = 0.26 * duration;
 		double tipStart = 0.46 * duration;
 		double impact = 0.72 * duration;

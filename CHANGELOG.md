@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.3
+
+### New
+- **Riders are physics bodies.** A rider that dies on a living mount (a skeleton horseman, a spider or chicken jockey, a pillager on a ravager, a player on a horse) leaves its seat with the mount's momentum, pushed away from the blow, and tumbles to the ground, instead of playing the 1.0 animation.
+- **Mannequins** get a body like a player's instead of the vanilla death.
+- **Armor and held items burn in lava.** Armor, horse and wolf armor and llama carpets burn black exactly where they were under the lava, like the skin under them. A held item burns black once the hand holding it goes in. Netherite and anything else that does not burn in lava keeps its look.
+- **Push Dead Bodies** (setting, on by default). A player or living mob that walks into a physics body pushes it along. Only you see it move, and the body never pushes back, so moving stays exactly as in vanilla.
+- **Blood (Beta)** (setting, off by default). A spray of blood from where the killing blow struck, a few drops while the body is fresh, and a splatter on a hard landing. Bones, golems, slimes, blazes, breezes, shulkers, allays, vexes and mannequins never bleed, and nothing bleeds in lava.
+
+### Fixed
+- **Bodies above the build limit did not fall.** A mob or player that died at y 320 or higher froze where it died, shook for a second and vanished, instead of falling: the game counts those heights as never loaded, and the body was let go on its first tick. Now only whether the chunk under the body is loaded counts.
+- On NeoForge 26.2 and 26.3 a warning came up at startup about the mod's icon (NeoForge renamed the setting for it).
+
+### Changed
+- **One Body Lifetime.** Body Lifetime and Physics Body Lifetime are now one setting, Body Lifetime (5 seconds by default, 1 to 60), in the General section. It sets how long a body stays with Physics Bodies on or off; with Physics Bodies off, the death animations play out as before and the body then lies there for the rest of its lifetime. The old `lifetimeTicks` in the settings file is no longer read.
+- **A Beta section** in the settings, after Physics, holds Knees and Elbows and Blood.
+- **Death Camera is on by default.**
+- A player whose skin cannot be burnt pixel by pixel is still drawn burnt black, but their armor and held items now burn (or not) on their own instead of all going dark.
+
 ## 1.1.2
 
 ### New
@@ -34,7 +53,7 @@
 Dead mobs are now real physics bodies instead of playing a fixed animation.
 
 ### New
-- **Physics bodies.** A dying mob becomes a set of rigid parts joined at its joints. It falls, tumbles, slides and comes to rest on whatever blocks are there: stairs, slabs, fences, walls. It is built from the mob's own model, so armor and held items follow. Every mob gets one except the shulker (and the Ender Dragon, Wither and armor stands, which stay vanilla).
+- **Physics bodies.** A dying mob becomes a set of rigid parts joined at its joints. It falls, tumbles, slides and comes to rest on whatever blocks are there: stairs, slabs, fences, walls. It is built from the mob's own model, so armor and held items follow. Every mob gets one except the shulker (which followed in 1.1.1) (and the Ender Dragon, Wither and armor stands, which stay vanilla).
 - **The killing blow matters.** A melee hit pushes the part it struck and knocks the body back; Knockback, sprint hits and Punch bows throw it further. Arrows hit the part they pass through. Explosions (creepers and TNT) fling every body away from the blast and are blocked by walls. A mace smash drives the body down.
 - **Dying muscles.** For about a second and a half the body braces, reaches and curls, then goes limp. Arms go out in a forward fall; limbs twitch a little after landing.
 - **Water and lava.** Bodies float instead of sinking, drift with the current, rise fast in a soul sand bubble column and slowly in a magma one. In lava they float higher, and the pixels that touched the lava are burnt black for good, with a darker ring around them.

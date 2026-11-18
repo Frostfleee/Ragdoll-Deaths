@@ -855,10 +855,11 @@ public class RagdollVisualTest implements FabricClientGameTest {
 			film(context, server, "melee-hit", 64, hit);
 		}
 		if (runs.test("knockback-hit")) {
-			stage(context, world, server, x, y, z, x + 13.0, y + 4.5, z + 4.5, x + 0.5, y + 0.5, z + 1.5);
-			server.runCommand(String.format("summon husk %d.5 %d %d.5 {NoAI:1b,Tags:[\"star\"],Rotation:[180f,0f]}", x, y, z - 4));
+			// A zombie in an iron helmet, seen from close by.
+			stage(context, world, server, x, y, z, x + 9.0, y + 3.4, z + 3.0, x + 0.5, y + 0.6, z + 0.5);
+			server.runCommand(String.format("summon zombie %d.5 %d %d.5 {NoAI:1b,Tags:[\"star\"],Rotation:[180f,0f],equipment:{head:{id:\"minecraft:iron_helmet\"}}}", x, y, z - 4));
 			attacker(server, x + 0.5, y + 1.0, z - 7.0);
-			film(context, server, "knockback-hit", 74, "data merge entity @e[tag=star,limit=1] {Motion:[0.0d,0.0d,2.6d]}", hit);
+			film(context, server, "knockback-hit", 92, "data merge entity @e[tag=star,limit=1] {Motion:[0.0d,0.0d,2.6d]}", hit);
 		}
 		if (runs.test("arrow-headshot")) {
 			// Seen from the side and a little behind, so the arrow's whole flight is in the picture; it flies at the
@@ -1029,6 +1030,24 @@ public class RagdollVisualTest implements FabricClientGameTest {
 		// The camera is the spectator's eyes, 1.62 above where it is put.
 		look(world, server, camX, camY - 1.62, camZ, atX, atY, atZ);
 		context.waitTicks(10);
+		settle(context, world);
+	}
+
+	/**
+	 * Waits until the far land is all there: the server goes on sending chunks out to the view distance for a while
+	 * after the camera moves, and each one popped in on the horizon in the middle of a clip. Done when no chunk has
+	 * arrived for two seconds and every section is drawn, or after thirty seconds.
+	 */
+	private static void settle(ClientGameTestContext context, TestSingleplayerContext world) {
+		int last = -1, still = 0;
+		for (int tick = 0; tick < 600 && still < 40; tick++) {
+			int loaded = context.computeOnClient(client -> client.level.getChunkSource().getLoadedChunksCount());
+			boolean drawn = context.computeOnClient(client -> client.levelRenderer.hasRenderedAllSections());
+			still = loaded == last && drawn ? still + 1 : 0;
+			last = loaded;
+			context.waitTick();
+		}
+		waitForChunks(world);
 	}
 
 	/** Something to be the attacker that nobody can see: an interaction entity has no model at all. */

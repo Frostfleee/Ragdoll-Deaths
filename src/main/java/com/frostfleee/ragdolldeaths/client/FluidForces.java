@@ -89,6 +89,9 @@ final class FluidForces {
 				if (ragdoll.wet != null) {
 					ragdoll.wet[i] = false;
 				}
+				if (ragdoll.lavaNow != null) {
+					ragdoll.lavaNow[i] = false;
+				}
 				continue;
 			}
 			any = true;
@@ -97,6 +100,16 @@ final class FluidForces {
 				ragdoll.wet = new boolean[ragdoll.bodies.length];
 			}
 			ragdoll.wet[i] = !lava;
+			if (ragdoll.lavaNow == null) {
+				ragdoll.lavaNow = new boolean[ragdoll.bodies.length];
+			}
+			ragdoll.lavaNow[i] = lava;
+			if (lava) {
+				if (ragdoll.burnt == null) {
+					ragdoll.burnt = new boolean[ragdoll.bodies.length];
+				}
+				ragdoll.burnt[i] = true;
+			}
 			double floats = lava ? lavaFloat(ragdoll, config) : waterFloat(ragdoll.roles[i], i == ragdoll.torso, config);
 			body.lift = GRAVITY * floats * submerged;
 			double speed = Math.sqrt((body.vx - flowX) * (body.vx - flowX) + (body.vy - flowY) * (body.vy - flowY) + (body.vz - flowZ) * (body.vz - flowZ));

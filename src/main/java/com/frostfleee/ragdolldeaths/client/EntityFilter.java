@@ -51,7 +51,6 @@ final class EntityFilter {
 		return entity instanceof EnderDragon
 				|| entity instanceof WitherBoss
 				|| entity instanceof ArmorStand
-				|| Mobs.isCreaking(entity)
-				|| Mobs.isMannequin(entity);
+				|| Mobs.isCreaking(entity);
 	}
 }

@@ -48,6 +48,14 @@ public final class RagdollAnimator {
 	private RagdollAnimator() {
 	}
 
+	/**
+	 * How long the death animation takes to play out, in ticks: the Body Lifetime, but no longer than
+	 * {@link RagdollConfig#CLASSIC_ANIMATION_TICKS}, so a long lifetime only makes the body lie there longer.
+	 */
+	public static double animationTicks(RagdollConfig config) {
+		return Math.min(config.bodyLifetimeTicks, RagdollConfig.CLASSIC_ANIMATION_TICKS);
+	}
+
 	/** Age in ticks at which the body vanishes. Anything past the vanilla window is drawn by a client ghost. */
 	public static double endTick(DeathProfile profile, RagdollConfig config) {
 		if (profile.kind() == BodyKind.SHULKER) {
@@ -58,25 +66,25 @@ public final class RagdollAnimator {
 		}
 		if (profile.freeFall()) {
 			double land = landTick(profile, config);
-			double rest = config.lifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
+			double rest = config.bodyLifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
 			return land >= config.ghostMaxTicks ? config.ghostMaxTicks : land / config.animationSpeed + rest;
 		}
 		if (profile.blasted()) {
 			// The death plays while it flies, so it needs only about half its usual rest once it has landed.
 			double land = landTick(profile, config);
-			double end = config.lifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
+			double end = config.bodyLifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
 			return land >= config.ghostMaxTicks ? config.ghostMaxTicks
-					: Math.min(config.ghostMaxTicks, Math.max(end, land / config.animationSpeed + config.lifetimeTicks * 0.5));
+					: Math.min(Math.max(config.ghostMaxTicks, end), Math.max(end, land / config.animationSpeed + config.bodyLifetimeTicks * 0.5));
 		}
 		if (profile.ghostCapable()) {
 			double landing = landTick(profile, config) / config.animationSpeed + GHAST_SETTLE_TICKS;
-			return Math.clamp(landing, config.lifetimeTicks, config.ghostMaxTicks);
+			return Math.clamp(landing, config.bodyLifetimeTicks, Math.max(config.ghostMaxTicks, config.bodyLifetimeTicks));
 		}
 		DeathCause cause = effectiveCause(profile, config);
 		if (profile.special() == Special.WARDEN && SpecialDeaths.handles(profile, cause, config)) {
-			return config.lifetimeTicks + config.wardenExtraTicks;
+			return config.bodyLifetimeTicks + config.wardenExtraTicks;
 		}
-		double end = config.lifetimeTicks;
+		double end = config.bodyLifetimeTicks;
 		if (cause == DeathCause.LAVA) {
 			end = Math.min(end, LAVA_SUBMERGE_TICKS + 1);
 		}
@@ -135,13 +143,13 @@ public final class RagdollAnimator {
 		if (profile.landedIn() == DeathCause.LAVA) {
 			return land + LAVA_SUBMERGE_TICKS + 1;
 		}
-		double rest = config.lifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
+		double rest = config.bodyLifetimeTicks + (profile.special() == Special.WARDEN ? config.wardenExtraTicks : 0);
 		if (profile.blasted()) {
 			// The death plays while it flies, so it needs only about half its usual rest once it has landed.
-			return Math.max(rest, land + config.lifetimeTicks * 0.5);
+			return Math.max(rest, land + config.bodyLifetimeTicks * 0.5);
 		}
 		if (profile.kind().airborne()) {
-			return Math.max(config.lifetimeTicks, land + (profile.kind() == BodyKind.GHAST ? GHAST_SETTLE_TICKS : config.lifetimeTicks * 0.5));
+			return Math.max(config.bodyLifetimeTicks, land + (profile.kind() == BodyKind.GHAST ? GHAST_SETTLE_TICKS : config.bodyLifetimeTicks * 0.5));
 		}
 		return land + rest;
 	}
@@ -607,7 +615,7 @@ public final class RagdollAnimator {
 	}
 
 	static double collapseTicks(DeathProfile profile, RagdollConfig config) {
-		return Math.min(11.0 * pace(profile), config.lifetimeTicks * 0.6);
+		return Math.min(11.0 * pace(profile), animationTicks(config) * 0.6);
 	}
 
 	/** Time multiplier: heavy bodies move slower, babies a little faster. */

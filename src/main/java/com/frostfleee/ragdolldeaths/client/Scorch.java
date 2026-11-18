@@ -6,6 +6,8 @@ import com.mojang.blaze3d.platform.NativeImage;
 import java.io.InputStream;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -26,6 +28,9 @@ import org.joml.Vector3f;
  * <p>Each pixel of the texture is found on the model (every face of every cube knows which patch of the texture it
  * shows), placed in the world from where the body part is, and tested against the lava there. This only runs on
  * ticks when part of the body is in lava.
+ *
+ * <p>Armor and other layers (horse armor, a llama's carpet) burn the same way, each on a copy of its own texture,
+ * placed by its own model: a layer model's parts sit at the same pivots as the mob's, so they follow the same bodies.
  */
 final class Scorch {
 	/** How dark each stage is: the burnt pixels themselves, then the two rings around them. */
@@ -43,13 +48,20 @@ final class Scorch {
 	private final byte[] distance;
 	private boolean closed;
 
+	/** The layer model this texture is drawn on, or null for the mob's own model. */
+	private final Model model;
+	/** The parts of the layer model that are drawn with this texture (a helmet's head, a chestplate's body and arms), or null for all. */
+	private final Set<ModelPart> drawnParts;
+
 	private final Matrix4f matrix = new Matrix4f();
 	private final Quaternionf rotation = new Quaternionf();
 	private final Vector3f point = new Vector3f();
 	private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
-	private Scorch(NativeImage original) {
+	private Scorch(NativeImage original, Model model, Set<ModelPart> drawnParts) {
 		this.original = original;
+		this.model = model;
+		this.drawnParts = drawnParts;
 		width = original.getWidth();
 		height = original.getHeight();
 		burnt = new boolean[width * height];
@@ -66,12 +78,17 @@ final class Scorch {
 
 	/** A scorchable copy of a texture, or null when its pixels cannot be read (a player's skin, say). */
 	static Scorch of(Object base) {
+		return of(base, null, null);
+	}
+
+	/** The same for a layer: its texture, the model it is drawn on, and which of that model's parts it covers. */
+	static Scorch of(Object base, Model model, Set<ModelPart> drawnParts) {
 		if (base == null) {
 			return null;
 		}
 		try {
 			try (InputStream in = Compat.openResource(base)) {
-				return in == null ? null : new Scorch(NativeImage.read(in));
+				return in == null ? null : new Scorch(NativeImage.read(in), model, drawnParts);
 			}
 		} catch (Exception e) {
 			return null;
@@ -88,10 +105,11 @@ final class Scorch {
 
 	/** Burns every pixel of the body's skin that is under lava right now. */
 	void update(PhysicsRagdoll ragdoll) {
-		if (closed || ragdoll.mainModel == null) {
+		Model drawnOn = model != null ? model : ragdoll.mainModel;
+		if (closed || drawnOn == null) {
 			return;
 		}
-		ModelPart root = Compat.root(ragdoll.mainModel);
+		ModelPart root = Compat.root(drawnOn);
 		Level level = ragdoll.entity.level();
 		// Which parts are placed by a body; the rest are carried along inside one of those.
 		Map<ModelPart, PhysicsRagdoll.Link> driven = new IdentityHashMap<>();
@@ -101,10 +119,22 @@ final class Scorch {
 				driven.put(part, link);
 			}
 		}
+		Map<ModelPart, PhysicsRagdoll.Link> burning = driven;
+		if (drawnParts != null) {
+			// A layer burns only on the parts it is drawn on: a chestplate on its model's body and arms, not its head.
+			burning = new IdentityHashMap<>(driven);
+			burning.keySet().retainAll(drawnParts);
+		}
 		Body origin = ragdoll.bodies[ragdoll.torso];
 		boolean changed = false;
-		for (Map.Entry<ModelPart, PhysicsRagdoll.Link> entry : driven.entrySet()) {
-			Body body = ragdoll.bodies[entry.getValue().body()];
+		for (Map.Entry<ModelPart, PhysicsRagdoll.Link> entry : burning.entrySet()) {
+			int index = entry.getValue().body();
+			// Only a part that is in lava this tick can burn: testing every pixel of a body (and of its armor) every
+			// tick cost several milliseconds, enough for the physics to let bodies go early.
+			if (ragdoll.lavaNow != null && !ragdoll.lavaNow[index]) {
+				continue;
+			}
+			Body body = ragdoll.bodies[index];
 			// Relative to the torso, so the numbers stay small enough for float matrices.
 			matrix.translation((float) (body.x - origin.x), (float) (body.y - origin.y), (float) (body.z - origin.z))
 					.rotate(rotation.set((float) body.qx, (float) body.qy, (float) body.qz, (float) body.qw))
@@ -220,7 +250,7 @@ final class Scorch {
 		texture.upload();
 	}
 
-	private static ModelPart find(ModelPart root, String[] path) {
+	static ModelPart find(ModelPart root, String[] path) {
 		ModelPart part = root;
 		for (String name : path) {
 			part = part == null ? null : ((ModelPartAccessor) (Object) part).ragdolldeaths$children().get(name);

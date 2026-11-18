@@ -25,7 +25,7 @@ gradle() {
 		if ./gradlew "$@" > build-all.log 2>&1; then
 			return 0
 		fi
-		grep -q "clean up\|stale\|being used by another process\|Unable to delete" build-all.log || { cat build-all.log; return 1; }
+		grep -q "clean up\|stale\|being used by another process\|Unable to delete\|Cannot snapshot\|unreadable" build-all.log || { cat build-all.log; return 1; }
 		rm -rf build/classes build/resources build/test-results build/reports build/generated 2> /dev/null || true
 		sleep 3
 	done

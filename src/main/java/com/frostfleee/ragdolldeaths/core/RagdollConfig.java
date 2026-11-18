@@ -12,9 +12,11 @@ import java.util.stream.Collectors;
 
 public final class RagdollConfig {
 	public static final int VANILLA_DEATH_TICKS = 20;
-	public static final int MIN_LIFETIME_TICKS = 4;
-	public static final int MAX_LIFETIME_TICKS = 60;
-	public static final int DEFAULT_LIFETIME_TICKS = 30;
+	/**
+	 * How long the Physics Bodies off death animations take to play out, in ticks; with a shorter Body Lifetime they
+	 * play faster. A body lies still for the rest of its lifetime.
+	 */
+	public static final int CLASSIC_ANIMATION_TICKS = 30;
 	public static final int DEFAULT_GHOST_TICKS = 60;
 	public static final int MAX_GHOST_TICKS = 100;
 	public static final int MAX_WARDEN_EXTRA_TICKS = 60;
@@ -24,7 +26,6 @@ public final class RagdollConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
 	public boolean enabled = true;
-	public int lifetimeTicks = DEFAULT_LIFETIME_TICKS;
 	public double animationSpeed = 1.0;
 	public double maxRenderDistance = 64.0;
 	public int maxActiveRagdolls = 64;
@@ -47,7 +48,10 @@ public final class RagdollConfig {
 
 	/** Real physics bodies. Off brings back the animation-only deaths, for weak computers. */
 	public boolean physicsRagdolls = true;
-	/** How long a physics body lies there before it vanishes, in ticks. */
+	/**
+	 * How long a body lies there before it vanishes, in ticks, with Physics Bodies on or off. Past vanilla's 20 ticks
+	 * it is drawn only on this client, after the server has removed the mob.
+	 */
 	public int bodyLifetimeTicks = DEFAULT_BODY_LIFETIME_TICKS;
 	/**
 	 * Beta, off by default: cuts arms and legs in two so they bend at a knee or an elbow. Bodies crumple more
@@ -70,8 +74,12 @@ public final class RagdollConfig {
 	public boolean impactSounds = true;
 	/** A puff of the block's dust on a hard landing, drops of water on a splash. */
 	public boolean impactParticles = true;
+	/** Beta, off by default: a spray of blood from the killing blow, drips, and a splatter on a hard landing. */
+	public boolean blood = false;
+	/** Living players and mobs that walk into a physics body push it along. The body never pushes back. */
+	public boolean pushBodies = true;
 	/** When you die, the view switches to third person so you see your own body fall; it switches back when you respawn. */
-	public boolean deathCamera = false;
+	public boolean deathCamera = true;
 	/** How far the death camera stays from your body's head, in blocks (closer when a wall is in the way). */
 	public double deathCameraDistance = 3.5;
 	/** Whether the death camera slowly circles your body; off, it holds the angle it started from. */
@@ -106,14 +114,13 @@ public final class RagdollConfig {
 
 	public RagdollConfig sanitize() {
 		RagdollConfig defaults = new RagdollConfig();
-		lifetimeTicks = Math.clamp(lifetimeTicks, MIN_LIFETIME_TICKS, MAX_LIFETIME_TICKS);
 		animationSpeed = finiteOr(animationSpeed, defaults.animationSpeed, 0.5, 2.0);
 		maxRenderDistance = finiteOr(maxRenderDistance, defaults.maxRenderDistance, 4.0, 512.0);
 		maxActiveRagdolls = Math.clamp(maxActiveRagdolls, 1, 512);
 		hitReactionStrength = finiteOr(hitReactionStrength, defaults.hitReactionStrength, 0.0, 2.0);
 		bounceStrength = finiteOr(bounceStrength, defaults.bounceStrength, 0.0, 2.0);
 		wardenExtraTicks = Math.clamp(wardenExtraTicks, 0, MAX_WARDEN_EXTRA_TICKS);
-		ghostMaxTicks = Math.clamp(ghostMaxTicks, Math.max(VANILLA_DEATH_TICKS, lifetimeTicks), MAX_GHOST_TICKS);
+		ghostMaxTicks = Math.clamp(ghostMaxTicks, VANILLA_DEATH_TICKS, MAX_GHOST_TICKS);
 		bodyLifetimeTicks = Math.clamp(bodyLifetimeTicks, VANILLA_DEATH_TICKS, MAX_BODY_LIFETIME_TICKS);
 		maxBodies = Math.clamp(maxBodies, 1, 256);
 		muscleSeconds = finiteOr(muscleSeconds, defaults.muscleSeconds, 0.0, 5.0);

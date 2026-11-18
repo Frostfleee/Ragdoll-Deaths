@@ -102,16 +102,154 @@ final class PhysicsRagdoll {
 	Scorch scorch;
 	private boolean scorchFailed;
 
-	/** Burns the pixels that are in lava this tick. */
+	/** Which bodies have been in lava, in body order; null until one has. A held item burns with the hand that held it. */
+	boolean[] burnt;
+	/** The living things near the body this tick, which push it (see BodyPushing); null when none were looked for. */
+	List<LivingEntity> walkers;
+	/** Which burnt texture's turn it is: one is tested a tick, to spread the cost. */
+	private int scorchTurn;
+	/** Which bodies are in lava this tick: only their pixels are tested for burning (see Scorch). */
+	boolean[] lavaNow;
+
+	/** An armor piece or other layer drawn on this body: its texture, its model, and its burnt copy once it has one. */
+	private static final class Layer {
+		final Object base;
+		final Model model;
+		/** The model's parts this texture is drawn on, noted as they are drawn (a helmet: the head and hat). */
+		final java.util.Set<ModelPart> parts = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+		Scorch scorch;
+		boolean failed;
+
+		Layer(Object base, Model model) {
+			this.base = base;
+			this.model = model;
+		}
+	}
+
+	/** At most this many layers burn: a body never wears more, and a strange mod cannot make it grow. */
+	private static final int MAX_LAYERS = 12;
+	private final List<Layer> layers = new ArrayList<>();
+
+	/** Burns the pixels that are in lava this tick, on the body and on every layer it wears. */
 	void scorchTick() {
 		if (scorch == null && !scorchFailed) {
 			scorch = Scorch.of(baseTexture);
 			// A texture that cannot be read (a player's skin) leaves the whole body darkened instead.
 			scorchFailed = scorch == null && baseTexture != null;
 		}
-		if (scorch != null) {
-			scorch.update(this);
+		for (Layer layer : layers) {
+			if (layer.scorch == null && !layer.failed) {
+				layer.scorch = Scorch.of(layer.base, layer.model, layer.parts);
+				layer.failed = layer.scorch == null;
+			}
 		}
+		// One texture a tick, the skin and each layer in turn: testing them all every tick cost enough time for the
+		// physics to let bodies go early. A burn shows a few ticks later at most.
+		List<Scorch> all = new ArrayList<>();
+		if (scorch != null) {
+			all.add(scorch);
+		}
+		for (Layer layer : layers) {
+			if (layer.scorch != null) {
+				all.add(layer.scorch);
+			}
+		}
+		if (!all.isEmpty()) {
+			all.get(scorchTurn++ % all.size()).update(this);
+		}
+	}
+
+	/** Lets go of every burnt texture copy; the body is gone. */
+	void closeScorches() {
+		if (scorch != null) {
+			scorch.close();
+		}
+		for (Layer layer : layers) {
+			if (layer.scorch != null) {
+				layer.scorch.close();
+			}
+		}
+	}
+
+	/**
+	 * The texture to draw a layer (armor, horse armor, a carpet) with: its own burnt copy once lava has reached it, else
+	 * the texture it has. An item that does not burn in lava (netherite) keeps its own. Notes, as it is drawn, which
+	 * parts of the layer's model the texture covers, so only those burn.
+	 */
+	@SuppressWarnings("unchecked")
+	<T> T layerTexture(T base, Model model, net.minecraft.world.item.ItemStack stack) {
+		if (base == null || model == null || model == mainModel || !built() || fireproof(stack)) {
+			return base;
+		}
+		Layer layer = null;
+		for (Layer candidate : layers) {
+			if (candidate.scorch != null && candidate.scorch.id.equals(base)) {
+				// Already this layer's burnt copy (a game version that hands the texture on to a second method).
+				return base;
+			}
+		}
+		for (Layer candidate : layers) {
+			if (candidate.model == model && candidate.base.equals(base)) {
+				layer = candidate;
+				break;
+			}
+		}
+		if (layer == null) {
+			if (layers.size() >= MAX_LAYERS) {
+				return base;
+			}
+			layer = new Layer(base, model);
+			layers.add(layer);
+		}
+		ModelPart root = Compat.root(model);
+		for (Link link : links) {
+			ModelPart part = Scorch.find(root, link.path());
+			if (part != null && part.visible) {
+				layer.parts.add(part);
+			}
+		}
+		return layer.scorch != null ? (T) layer.scorch.id : base;
+	}
+
+	/** For the self-test: each layer noted on this body, with whether it has burnt, e.g. "netherite.png kept". */
+	List<String> layerReport() {
+		List<String> lines = new ArrayList<>();
+		for (Layer layer : layers) {
+			String name = layer.base.toString();
+			lines.add(name.substring(name.lastIndexOf('/') + 1) + (layer.scorch != null ? " burnt" : " kept"));
+		}
+		return lines;
+	}
+
+	/** Whether the item shrugs off lava, as netherite does when it is dropped in it. */
+	boolean fireproof(net.minecraft.world.item.ItemStack stack) {
+		return stack != null && !stack.isEmpty() && !stack.canBeHurtBy(entity.level().damageSources().lava());
+	}
+
+	/**
+	 * Whether the item held in that hand is burnt: the arm holding it went into lava, and the item burns. A mob with no
+	 * arm of that name (an item held in a fox's mouth) burns its item once any of it went into lava.
+	 */
+	boolean heldItemBurnt(net.minecraft.world.entity.HumanoidArm arm) {
+		if (!charred || burnt == null) {
+			return false;
+		}
+		net.minecraft.world.item.ItemStack stack = arm == entity.getMainArm() ? entity.getMainHandItem() : entity.getOffhandItem();
+		if (fireproof(stack)) {
+			return false;
+		}
+		String name = arm == net.minecraft.world.entity.HumanoidArm.RIGHT ? "right_arm" : "left_arm";
+		boolean found = false;
+		for (Link link : links) {
+			String[] path = link.path();
+			if (path.length > 0 && path[path.length - 1].equals(name)) {
+				found = true;
+				if (burnt[link.body()]) {
+					return true;
+				}
+			}
+		}
+		return !found;
 	}
 
 	/** Whether the body is burnt but has no texture of its own to show it on. */
@@ -143,6 +281,16 @@ final class PhysicsRagdoll {
 	private final Quaternionf rotation = new Quaternionf();
 	private final Vector3f angles = new Vector3f();
 	private final double[] at = new double[7];
+
+	/**
+	 * For a rider that died on its mount: the speed it leaves its seat with, in blocks per second (the mount's momentum,
+	 * a push away from the blow and a little hop). Null for everything else, which starts with the speed it really had.
+	 */
+	Vec3 seatThrow;
+	/** Whether this mob has blood (see Blood), the body the killing blow struck, and how long it has dripped. */
+	boolean bleeds;
+	int bleedingBody = -1;
+	int bleedTicks;
 
 	PhysicsRagdoll(LivingEntity entity) {
 		this.entity = entity;

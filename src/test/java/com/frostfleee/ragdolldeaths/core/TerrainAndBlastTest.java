@@ -10,7 +10,8 @@ import org.junit.jupiter.api.Test;
 class TerrainAndBlastTest {
 	private static final int TOWARD_MINUS_Z = 6;
 
-	private final RagdollConfig config = RagdollConfig.defaults();
+	/** A short Body Lifetime (1.5 s), shorter than the ghost limit, so the falls and floats below decide when a body ends. */
+	private final RagdollConfig config = RagdollConfig.parse("{\"bodyLifetimeTicks\": 30}");
 	private final RagdollPose pose = new RagdollPose();
 	private final JointPose joints = new JointPose();
 

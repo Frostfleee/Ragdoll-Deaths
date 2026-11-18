@@ -117,7 +117,7 @@ final class RagdollBuilder {
 			total += piece.weight;
 		}
 		double mass = ZOMBIE_MASS * entity.getBbWidth() * entity.getBbWidth() * entity.getBbHeight() / ZOMBIE_VOLUME;
-		Vec3 velocity = velocityOf(entity);
+		Vec3 velocity = ragdoll.seatThrow != null ? ragdoll.seatThrow : velocityOf(entity);
 
 		Body[] bodies = new Body[pieces.size()];
 		List<PhysicsRagdoll.Link> links = new ArrayList<>();
@@ -152,6 +152,10 @@ final class RagdollBuilder {
 		}
 		ragdoll.roles = roles;
 		ragdoll.blow = DeathBlow.apply(entity, bodies, jointArray, roles, ConfigStore.get());
+		ragdoll.bodies = bodies;
+		if (Blood.active(ragdoll, ConfigStore.get())) {
+			Blood.blow(ragdoll, DeathBlow.lastStrength);
+		}
 		ragdoll.muscles = muscles(root, pieces, jointArray, entity);
 		Island island = new Island(bodies, jointArray);
 		// Parts that already overlap where the model puts them (a spider's eight legs meet at its body) must not be

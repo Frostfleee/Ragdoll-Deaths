@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 class RagdollAnimatorTest {
-	private final RagdollConfig config = RagdollConfig.defaults();
+	/** A short Body Lifetime (1.5 s), shorter than the ghost limit, so the falls and floats below decide when a body ends. */
+	private final RagdollConfig config = RagdollConfig.parse("{\"bodyLifetimeTicks\": 30}");
 	private final RagdollPose pose = new RagdollPose();
 	private final JointPose joints = new JointPose();
 
@@ -169,19 +170,19 @@ class RagdollAnimatorTest {
 	@Test
 	void groundedGhastUsesTheNormalLifetime() {
 		DeathProfile grounded = DeathProfile.builder(BodyKind.GHAST).size(4.0, 4.0).floorDrop(0.0).ghostCapable(true).build();
-		assertEquals(config.lifetimeTicks, RagdollAnimator.endTick(grounded, config));
+		assertEquals(config.bodyLifetimeTicks, RagdollAnimator.endTick(grounded, config));
 	}
 
 	@Test
-	void everyBodyOutlivesTheVanillaWindowByDefault() {
+	void everyBodyOutlivesTheVanillaWindow() {
 		DeathProfile phantom = DeathProfile.builder(BodyKind.WINGED).size(0.9, 0.5).floorDrop(-30.0).build();
 		assertTrue(RagdollAnimator.needsGhost(phantom, config, RagdollConfig.VANILLA_DEATH_TICKS));
-		assertEquals(RagdollConfig.DEFAULT_LIFETIME_TICKS, RagdollAnimator.endTick(phantom, config));
+		assertEquals(config.bodyLifetimeTicks, RagdollAnimator.endTick(phantom, config));
 	}
 
 	@Test
 	void shortLifetimeNeedsNoGhost() {
-		RagdollConfig vanilla = RagdollConfig.parse("{\"lifetimeTicks\": 20}");
+		RagdollConfig vanilla = RagdollConfig.parse("{\"bodyLifetimeTicks\": 20}");
 		DeathProfile pig = DeathProfile.builder(BodyKind.STANDARD).size(0.9, 0.9).build();
 		assertFalse(RagdollAnimator.needsGhost(pig, vanilla, RagdollConfig.VANILLA_DEATH_TICKS - 1));
 	}
@@ -204,11 +205,11 @@ class RagdollAnimatorTest {
 
 	@Test
 	void shortLifetimeHidesTheBodyEarly() {
-		RagdollConfig quick = RagdollConfig.parse("{\"lifetimeTicks\": 10}");
+		RagdollConfig quick = RagdollConfig.parse("{\"bodyLifetimeTicks\": 20}");
 		DeathProfile pig = DeathProfile.builder(BodyKind.STANDARD).size(0.9, 0.9).build();
-		RagdollAnimator.compute(pig, quick, 9.0, pose, joints);
+		RagdollAnimator.compute(pig, quick, 19.0, pose, joints);
 		assertFalse(pose.hidden);
-		RagdollAnimator.compute(pig, quick, 10.0, pose, joints);
+		RagdollAnimator.compute(pig, quick, 20.0, pose, joints);
 		assertTrue(pose.hidden);
 	}
 
@@ -234,11 +235,11 @@ class RagdollAnimatorTest {
 	@Test
 	void bodyInDeepWaterStaysUntilItReachesTheSurface() {
 		DeathProfile shallow = DeathProfile.builder(BodyKind.AQUATIC).cause(DeathCause.WATER).water(0.5, 0.0).build();
-		assertEquals(config.lifetimeTicks, RagdollAnimator.endTick(shallow, config), "a short rise ends at the normal time");
+		assertEquals(config.bodyLifetimeTicks, RagdollAnimator.endTick(shallow, config), "a short rise ends at the normal time");
 
 		DeathProfile deep = DeathProfile.builder(BodyKind.AQUATIC).cause(DeathCause.WATER).water(3.0, 0.0).build();
 		double arrival = RagdollAnimator.waterArrivalTick(deep, config);
-		assertTrue(arrival > config.lifetimeTicks - 10.0);
+		assertTrue(arrival > config.bodyLifetimeTicks - 10.0);
 		assertEquals(arrival + 10.0, RagdollAnimator.endTick(deep, config), 1.0E-9);
 		assertTrue(RagdollAnimator.needsGhost(deep, config, 15.0));
 		assertEquals(3.0, RagdollAnimator.waterDrift(deep, config.waterBehavior, arrival), 1.0E-6, "at the surface when it ends");
@@ -249,7 +250,7 @@ class RagdollAnimatorTest {
 
 	@Test
 	void sinkingBodyStaysUntilItReachesTheBottom() {
-		RagdollConfig sink = RagdollConfig.defaults();
+		RagdollConfig sink = config.copy();
 		sink.waterBehavior = WaterBehavior.SINK;
 		DeathProfile zombie = DeathProfile.builder(BodyKind.STANDARD).rig(Rig.BIPED, 0.4).cause(DeathCause.WATER).water(4.0, 2.5).build();
 		double arrival = RagdollAnimator.waterArrivalTick(zombie, sink);
@@ -279,7 +280,7 @@ class RagdollAnimatorTest {
 
 	@Test
 	void animationSpeedScalesTheChoreographyButNotTheLifetime() {
-		RagdollConfig fast = RagdollConfig.parse("{\"animationSpeed\": 2.0}");
+		RagdollConfig fast = RagdollConfig.parse("{\"animationSpeed\": 2.0, \"bodyLifetimeTicks\": 30}");
 		DeathProfile zombie = DeathProfile.builder(BodyKind.STANDARD).size(0.6, 1.95).build();
 		RagdollAnimator.compute(zombie, fast, 5.0, pose, joints);
 		double fastAngle = pose.tipAngle;

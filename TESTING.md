@@ -9,7 +9,7 @@ Every living mob in Minecraft 26.3, grouped by the animation code it uses. Check
    - `/tick freeze` freezes time mid-death, so you can fly around the body. `/tick step 1` advances one tick. `/tick unfreeze` resumes.
    - `/kill @e[type=!player]` gives a death with **no direction** (the "crumple" animation).
    - Babies: add `{IsBaby:1b}` to zombie-type mobs, or `{Age:-24000}` to animals.
-3. Check `config/ragdolldeaths.json` has `"lifetimeTicks": 30`.
+3. Check `config/ragdolldeaths.json` has `"bodyLifetimeTicks": 100` (Body Lifetime, used with Physics Bodies on and off).
 
 **Automatic screenshots.** `./gradlew runClientGameTest -PvisualTests` opens a fresh flat test world by itself, stages a hit up close, a TNT blast, a fall off a ledge, a burning zombie falling 40 blocks and a body in a flowing channel, then closes. Screenshots land in `build/run/clientGameTest/screenshots`. It's a quick first look before the manual checks below.
 
@@ -50,6 +50,7 @@ Every living mob in Minecraft 26.3, grouped by the animation code it uses. Check
 - [x] Copper Golem
 - [x] Frog (F, N, Fall): flips onto its back like the armadillo, arms and legs curled up
 - [x] Player in third person (`playerRagdolls` is on by default)
+- [ ] Mannequin (`/summon mannequin`, 1.21.9 and later): a body like a player's, never bleeds
 
 ## 2. Skeletons, bones scatter: test F, B, S, N, Fall (W and L use the two-legged animation)
 
@@ -119,7 +120,7 @@ Two ways to cause it:
 - **Knocked off:** stand a mob on a tall pillar (10+ blocks) and kill it so the hit knocks it off.
 - **Already falling:** `/summon zombie ~ ~25 ~` and shoot it on the way down.
 
-The body must keep falling with its limbs trailing up, play its death only after it touches the ground, then rest about 1.5 s. Over the void it vanishes after 3 s.
+The body must keep falling with its limbs trailing up, play its death only after it touches the ground, then rest until its Body Lifetime is up (5 s from death by default). Over the void it vanishes after 3 s.
 
 - [x] A two-legged mob (zombie), both ways
 - [x] A skeleton (it should only fall apart after landing)
@@ -168,7 +169,7 @@ The body must keep falling with its limbs trailing up, play its death only after
 
 ## 11. Odd shapes: test F, N
 
-- [x] Shulker on a floor, a wall and a ceiling (vanishes instantly, doesn't fall, bursts into the same particles as breaking a shulker box; a dyed shulker uses its own color)
+- [x] Shulker on a floor, a wall and a ceiling (with Physics Bodies on: the shell is knocked over and tumbles as a full box, then breaks like a shulker box when its time is up; off: vanishes instantly, doesn't fall, bursts into the same particles as breaking a shulker box; a dyed shulker uses its own color either way)
 - [x] Silverfish
 - [x] Endermite
 - [x] Rabbit
@@ -180,7 +181,6 @@ The body must keep falling with its limbs trailing up, play its death only after
 - [x] Wither
 - [x] Creaking
 - [x] Armor Stand
-- [x] Mannequin
 
 ## 13. Settings screen (needs Mod Menu, already in the dev client)
 
@@ -258,6 +258,22 @@ Clips for the mod page: `RAGDOLL_SCENES=showcase RAGDOLL_CLIPS=<names>` films th
 On 1.21.x run the same scenes with the `legacy/` build, for example `./gradlew -p legacy runClientGameTest -PvisualTests -Pminecraft_version=1.21.8 -Pfabric_api_version=0.136.1+1.21.8 -Pmodmenu_version=15.0.0 -Pcompat=mc1_21_5 "-Pminecraft_range=>=1.21.5 <1.21.9"` (the values for each group are in `build-all.sh`). Fabric has no client test API before 1.21.4: on 1.21.2 and 1.21.3, and on NeoForge and Forge everywhere, `runClient` with `-Dmixin.debug.verbose=true` (already set) lists every mixin applied as the game starts.
 
 By hand, check what the scenes cannot: the sounds (thud, splash, bone clatter), your own death with Death Camera on, another player's death, and a crowd (64 zombies and TNT) for stutter.
+
+## 18. New: riders, armor in lava, blood, settings
+
+The self-test (`./selftest-all.sh`) checks most of these by itself: a skeleton killed on its skeleton horse, a mannequin, a zombie in lava with a netherite helmet, an iron chestplate and an iron sword, the player walking through a cow's body, and a zombie killed above the build limit.
+
+- [ ] Skeleton on a skeleton horse, spider jockey, pillager on a ravager, player on a horse: each rider is a physics body that leaves the seat with the mount's momentum, pushed away from the blow, and tumbles off
+- [ ] A zombie in iron armor holding an iron sword knocked into lava: the armor is burnt only where it was under the lava, the sword is burnt black once its hand went in
+- [ ] The same with netherite armor and a netherite sword: they keep their look
+- [ ] Horse armor and a llama carpet in lava burn the same way
+- [ ] *Push Dead Bodies* (on by default): walk into a resting body and it slides along in front of you; a mob walking into one pushes it too; you walk exactly as without the mod. Off: bodies stay put
+- [ ] Above the build limit: on a superflat world, `/tp @p ~ ~380 ~` and kill a mob up there, then die yourself: both bodies fall to the ground (they used to freeze, shake and vanish)
+- [ ] NeoForge 26.2 and 26.3: no warning about the mod at startup
+- [ ] Settings screen: *Body Lifetime* is in General (one slider, 1 to 60 s, 5 s by default); there is no *Physics Body Lifetime*; a *Beta* section after Physics holds *Knees and Elbows (Beta)* and *Blood (Beta)*; *Death Camera* is on after *Reset to Defaults*
+- [ ] *Body Lifetime* at 2 s, with Physics Bodies on and then off: bodies vanish about 2 s after death both ways
+- [ ] *Blood (Beta)* off (the default): no blood anywhere
+- [ ] *Blood (Beta)* on: a zombie hit hard sprays from where it was hit, drips for about two seconds, splatters on a hard landing; a skeleton, iron golem, slime, blaze and mannequin never bleed; nothing bleeds in lava
 
 ## Reporting
 

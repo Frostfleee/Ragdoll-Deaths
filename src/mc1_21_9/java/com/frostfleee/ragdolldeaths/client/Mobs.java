@@ -55,7 +55,7 @@ public final class Mobs {
 		return false;
 	}
 
-	/** A mannequin (a player-shaped mob), which keeps the vanilla death. */
+	/** A mannequin (a player-shaped mob). It gets a body like a player's, and never bleeds. */
 	public static boolean isMannequin(Entity entity) {
 		return entity instanceof net.minecraft.world.entity.Avatar && !(entity instanceof net.minecraft.world.entity.player.Player);
 	}

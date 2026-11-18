@@ -26,6 +26,8 @@ final class PhysicsHost {
 	private static final double SOFT_BUDGET_MS = 2.0, HARD_BUDGET_MS = 6.0;
 	private static final int STRAIN_TICKS = 20, OVERRUN_TICKS = 5;
 	private int strained, overrun;
+	/** How many bodies have been let go early because the physics ran over its time; the self-test reports it. */
+	static int retiredForTime;
 	private final List<PhysicsRagdoll> ragdolls = new ArrayList<>();
 	private Level level;
 	private long ticks;
@@ -56,9 +58,7 @@ final class PhysicsHost {
 	void remove(PhysicsRagdoll ragdoll) {
 		if (ragdolls.remove(ragdoll)) {
 			world.remove(ragdoll.island);
-			if (ragdoll.scorch != null) {
-				ragdoll.scorch.close();
-			}
+			ragdoll.closeScorches();
 			if (DEBUG) {
 				StackTraceElement[] trace = Thread.currentThread().getStackTrace();
 				RagdollDeathsClient.LOGGER.info("[physics] removed {} (lava ticks {}), via {} <- {}", EntityFilter.idOf(ragdoll.entity.getType()), ragdoll.lavaTicks,
@@ -69,9 +69,7 @@ final class PhysicsHost {
 
 	void clear() {
 		for (PhysicsRagdoll ragdoll : ragdolls) {
-			if (ragdoll.scorch != null) {
-				ragdoll.scorch.close();
-			}
+			ragdoll.closeScorches();
 		}
 		ragdolls.clear();
 		world.clear();
@@ -114,11 +112,26 @@ final class PhysicsHost {
 			if (ragdoll.island.asleep && (ticks + i) % WAKE_CHECK_TICKS == 0 && (world.worldChanged(ragdoll.island) || fluids.moving(ragdoll))) {
 				ragdoll.island.wake();
 			}
+			// Living players and mobs walking into the body push it along (and wake it); nothing pushes back. Who is near
+			// is found once a tick; the pushes are given before each step, below.
+			ragdoll.walkers = null;
+			if (config.pushBodies && !ragdoll.failed) {
+				BodyPushing.find(ragdoll);
+				BodyPushing.push(ragdoll, 0.0);
+			}
 			if (!ragdoll.island.asleep) {
 				fluids.apply(ragdoll, ConfigStore.get());
 			}
 		}
 		for (int step = 1; step <= PhysicsRagdoll.STEPS_PER_TICK; step++) {
+			if (step > 1) {
+				for (int i = 0; i < ragdolls.size(); i++) {
+					PhysicsRagdoll ragdoll = ragdolls.get(i);
+					if (ragdoll.walkers != null && !ragdoll.failed) {
+						BodyPushing.push(ragdoll, (step - 1) / (double) PhysicsRagdoll.STEPS_PER_TICK);
+					}
+				}
+			}
 			world.step();
 			for (int i = 0; i < ragdolls.size(); i++) {
 				PhysicsRagdoll ragdoll = ragdolls.get(i);
@@ -139,7 +152,10 @@ final class PhysicsHost {
 			if (ragdoll.special != null && !ragdoll.failed) {
 				ragdoll.special.afterTick(ragdoll);
 			}
-			if (!ragdoll.failed && !ragdoll.island.asleep && (config.impactSounds || config.impactParticles)) {
+			if (!ragdoll.failed && Blood.active(ragdoll, config)) {
+				Blood.tick(ragdoll);
+			}
+			if (!ragdoll.failed && !ragdoll.island.asleep && (config.impactSounds || config.impactParticles || config.blood)) {
 				impacts.afterTick(ragdoll, config);
 			}
 		}
@@ -175,6 +191,7 @@ final class PhysicsHost {
 				// a player's body kept until they respawn is not let go (see Player Body Until Respawn)
 				if (!ragdoll.retired && !(keepPlayers && ragdoll.entity instanceof net.minecraft.world.entity.player.Player)) {
 					ragdoll.retired = true;
+					retiredForTime++;
 					break;
 				}
 			}

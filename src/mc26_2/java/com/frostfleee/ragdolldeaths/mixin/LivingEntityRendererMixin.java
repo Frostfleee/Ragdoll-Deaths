@@ -27,7 +27,17 @@ abstract class LivingEntityRendererMixin {
 		RagdollPose pose = RagdollRenderData.pose(state);
 		if (pose != null && pose.hidden) {
 			ci.cancel();
+			return;
 		}
+		// The armor and held-item layers submitted below ask which body they belong to.
+		PhysicsPoseApplier.drawing = pose != null || RagdollRenderData.physics(state) != null ? state : null;
+	}
+
+	@Inject(
+			method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+			at = @At("TAIL"))
+	private void ragdolldeaths$doneSubmitting(LivingEntityRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera, CallbackInfo ci) {
+		PhysicsPoseApplier.drawing = null;
 	}
 
 	@Inject(

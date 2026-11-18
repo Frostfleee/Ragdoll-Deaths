@@ -14,7 +14,8 @@ class RagdollConfigTest {
 	void defaultsMatchTheAgreedBehavior() {
 		RagdollConfig config = RagdollConfig.defaults();
 		assertTrue(config.enabled);
-		assertEquals(30, config.lifetimeTicks);
+		assertEquals(100, config.bodyLifetimeTicks);
+		assertTrue(config.deathCamera);
 		assertTrue(config.playerRagdolls);
 		assertEquals(WaterBehavior.FLOAT, config.waterBehavior);
 		assertTrue(config.lavaSink);
@@ -28,7 +29,7 @@ class RagdollConfigTest {
 	void missingFieldsFallBackToDefaults() {
 		RagdollConfig config = RagdollConfig.parse("{\"playerRagdolls\": false}");
 		assertFalse(config.playerRagdolls);
-		assertEquals(30, config.lifetimeTicks);
+		assertEquals(100, config.bodyLifetimeTicks);
 		assertTrue(config.excludedEntities.isEmpty());
 	}
 
@@ -47,9 +48,9 @@ class RagdollConfigTest {
 
 	@Test
 	void lifetimeIsClampedToItsRange() {
-		assertEquals(RagdollConfig.MAX_LIFETIME_TICKS, RagdollConfig.parse("{\"lifetimeTicks\": 200}").lifetimeTicks);
-		assertEquals(RagdollConfig.MIN_LIFETIME_TICKS, RagdollConfig.parse("{\"lifetimeTicks\": 0}").lifetimeTicks);
-		assertEquals(12, RagdollConfig.parse("{\"lifetimeTicks\": 12}").lifetimeTicks);
+		assertEquals(RagdollConfig.MAX_BODY_LIFETIME_TICKS, RagdollConfig.parse("{\"bodyLifetimeTicks\": 99999}").bodyLifetimeTicks);
+		assertEquals(RagdollConfig.VANILLA_DEATH_TICKS, RagdollConfig.parse("{\"bodyLifetimeTicks\": 0}").bodyLifetimeTicks);
+		assertEquals(60, RagdollConfig.parse("{\"bodyLifetimeTicks\": 60}").bodyLifetimeTicks);
 	}
 
 	@Test
@@ -63,7 +64,7 @@ class RagdollConfigTest {
 		assertEquals(2.0, config.animationSpeed);
 		assertEquals(RagdollConfig.MAX_WARDEN_EXTRA_TICKS, config.wardenExtraTicks);
 		assertEquals(2.0, config.hitReactionStrength);
-		assertEquals(RagdollConfig.DEFAULT_LIFETIME_TICKS, config.ghostMaxTicks);
+		assertEquals(RagdollConfig.VANILLA_DEATH_TICKS, config.ghostMaxTicks);
 		assertEquals(1, config.maxActiveRagdolls);
 	}
 
@@ -82,9 +83,18 @@ class RagdollConfigTest {
 	}
 
 	@Test
-	void ghostLimitNeverFallsBelowTheLifetime() {
-		RagdollConfig config = RagdollConfig.parse("{\"lifetimeTicks\": 50, \"ghostMaxTicks\": 25}");
-		assertEquals(50, config.ghostMaxTicks);
+	void aBodyStaysItsWholeLifetimePastTheGhostLimit() {
+		RagdollConfig config = RagdollConfig.parse("{\"bodyLifetimeTicks\": 600, \"ghostMaxTicks\": 25}");
+		assertEquals(25, config.ghostMaxTicks);
+		assertEquals(600.0, RagdollAnimator.endTick(DeathProfile.builder(BodyKind.STANDARD).size(0.9, 0.9).build(), config));
+		assertEquals(600.0, RagdollAnimator.endTick(DeathProfile.builder(BodyKind.GHAST).size(4.0, 4.0).floorDrop(-2.0).build(), config));
+	}
+
+	@Test
+	void theOldClassicLifetimeIsIgnored() {
+		RagdollConfig config = RagdollConfig.parse("{\"lifetimeTicks\": 12}");
+		assertEquals(RagdollConfig.DEFAULT_BODY_LIFETIME_TICKS, config.bodyLifetimeTicks);
+		assertFalse(config.toJson().contains("\"lifetimeTicks\""));
 	}
 
 	@Test

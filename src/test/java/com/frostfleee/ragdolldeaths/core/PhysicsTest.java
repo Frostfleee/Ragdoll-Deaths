@@ -184,7 +184,7 @@ class PhysicsTest {
 		assertTrue(RagdollAnimator.needsGhost(falling, config, 19.0));
 		assertEquals(200.0, RagdollAnimator.endTick(falling, config), "still falling: kept up to the fall limit");
 		DeathProfile landed = falling.withLanding(70.0, DeathCause.GROUND);
-		assertEquals(70.0 + config.lifetimeTicks, RagdollAnimator.endTick(landed, config), 1.0E-9, "lands at 3.5 s, then rests");
+		assertEquals(70.0 + config.bodyLifetimeTicks, RagdollAnimator.endTick(landed, config), 1.0E-9, "lands at 3.5 s, then rests");
 		RagdollPose pose = new RagdollPose();
 		RagdollAnimator.compute(landed, config, 75.0, pose, new JointPose());
 		assertFalse(pose.hidden);

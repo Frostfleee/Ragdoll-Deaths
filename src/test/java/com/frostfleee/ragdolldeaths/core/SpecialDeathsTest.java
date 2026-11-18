@@ -28,7 +28,7 @@ class SpecialDeathsTest {
 	void wardenKneelsThenLiesFaceDownBeforeVanishing() {
 		DeathProfile warden = DeathProfile.builder(BodyKind.STANDARD).special(Special.WARDEN).rig(Rig.BIPED, 0.3).size(0.9, 2.9).build();
 		double end = RagdollAnimator.endTick(warden, config);
-		assertEquals(config.lifetimeTicks + config.wardenExtraTicks, end);
+		assertEquals(config.bodyLifetimeTicks + config.wardenExtraTicks, end);
 
 		RagdollAnimator.compute(warden, config, 18.0, pose, joints);
 		assertTrue(joints.rotation(JointRole.LEG, Side.RIGHT, JointPose.X, 0, 0.0) > 1.2, "still kneeling");
@@ -49,7 +49,7 @@ class SpecialDeathsTest {
 		assertTrue(joints.scatters(JointRole.ROD));
 		assertEquals(0.0, joints.scatterDrop(JointRole.ROD, 0), "the rods hang on a moment before dropping");
 
-		RagdollAnimator.compute(blaze, config, config.lifetimeTicks - 1.0, pose, joints);
+		RagdollAnimator.compute(blaze, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 		for (int rod = 0; rod < 12; rod++) {
 			assertEquals(1.0, joints.scatterDrop(JointRole.ROD, rod), "rod " + rod + " reached the ground");
 			assertEquals(1.0, joints.scatterTip(JointRole.ROD, rod), "rod " + rod + " lies flat");
@@ -76,7 +76,7 @@ class SpecialDeathsTest {
 		RagdollAnimator.compute(breeze, config, 2.0, pose, joints);
 		assertTrue(joints.scale(JointRole.WIND, JointPose.X) > 1.0, "the whirlwind flares first");
 
-		RagdollAnimator.compute(breeze, config, config.lifetimeTicks - 1.0, pose, joints);
+		RagdollAnimator.compute(breeze, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 		double height = joints.scale(JointRole.WIND, JointPose.Y);
 		assertTrue(joints.scale(JointRole.WIND, JointPose.X) < 0.02, "gone");
 		assertEquals(24.0 * (1.0 - height), joints.translation(JointRole.WIND, Side.CENTER, JointPose.Y), 1.0E-6, "shrinks down onto the ground");
@@ -100,7 +100,7 @@ class SpecialDeathsTest {
 		assertEquals(1.0, SpecialDeaths.guardianSpikes(guardian, 2.0), "spikes shoot out");
 		assertEquals(0.0, SpecialDeaths.guardianSpikes(guardian, 20.0), 1.0E-9, "and sink back in");
 
-		RagdollAnimator.compute(guardian, config, config.lifetimeTicks - 1.0, pose, joints);
+		RagdollAnimator.compute(guardian, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 		assertEquals(Math.PI, Math.abs(pose.rollAngle), 0.05, "belly-up");
 		for (int segment = 0; segment < 3; segment++) {
 			for (int axis : new int[] {JointPose.X, JointPose.Y, JointPose.Z}) {
@@ -115,9 +115,9 @@ class SpecialDeathsTest {
 			for (DeathCause cause : new DeathCause[] {DeathCause.GROUND, DeathCause.WATER}) {
 				DeathProfile guardian = DeathProfile.builder(BodyKind.AQUATIC).special(Special.GUARDIAN).cause(cause).hit(hit, 30.0F).size(0.85, 0.85).build();
 				DeathProfile cow = DeathProfile.builder(BodyKind.STANDARD).rig(Rig.QUADRUPED, 0.4).hit(hit, 30.0F).size(0.9, 1.4).build();
-				RagdollAnimator.compute(guardian, config, config.lifetimeTicks - 1.0, pose, joints);
+				RagdollAnimator.compute(guardian, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 				double guardianRoll = pose.rollAngle;
-				RagdollAnimator.compute(cow, config, config.lifetimeTicks - 1.0, pose, joints);
+				RagdollAnimator.compute(cow, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 				assertEquals(Math.signum(pose.rollAngle), Math.signum(guardianRoll), hit + " " + cause);
 			}
 		}
@@ -140,7 +140,7 @@ class SpecialDeathsTest {
 	void elderGuardianStillFinishesRollingOverInTime() {
 		DeathProfile elder = DeathProfile.builder(BodyKind.AQUATIC).special(Special.GUARDIAN).cause(DeathCause.WATER).size(2.0, 2.0).build();
 		assertTrue(elder.heaviness() > 0.9);
-		RagdollAnimator.compute(elder, config, config.lifetimeTicks - 1.0, pose, joints);
+		RagdollAnimator.compute(elder, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 		assertEquals(Math.PI, Math.abs(pose.rollAngle), 0.05);
 	}
 
@@ -149,7 +149,7 @@ class SpecialDeathsTest {
 		DeathProfile guardian = DeathProfile.builder(BodyKind.AQUATIC).special(Special.GUARDIAN).size(0.85, 0.85).build();
 		RagdollAnimator.compute(guardian, config, 2.5, pose, joints);
 		assertTrue(pose.offsetY > 0.1, "flops up off the ground");
-		RagdollAnimator.compute(guardian, config, config.lifetimeTicks - 1.0, pose, joints);
+		RagdollAnimator.compute(guardian, config, config.bodyLifetimeTicks - 1.0, pose, joints);
 		assertEquals(Math.PI / 2.0, Math.abs(pose.rollAngle), 0.02, "on its side");
 	}
 

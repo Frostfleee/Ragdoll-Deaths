@@ -83,6 +83,9 @@ final class Impacts {
 					float pitch = (heavy ? 0.75F : 1.15F) * type.getPitch() * (0.9F + 0.2F * random.nextFloat());
 					level.playLocalSound(b.x, b.y, b.z, sound, SoundSource.NEUTRAL, volume, pitch, false);
 				}
+				if (Blood.active(ragdoll, config) && hardest > Blood.SPLATTER) {
+					Blood.splatter(level, b, hardest, random);
+				}
 				if (config.impactParticles && hardest > DUST) {
 					int puffs = Math.min(10, (int) (hardest / 3.0));
 					BlockParticleOption dust = new BlockParticleOption(ParticleTypes.BLOCK, ground);

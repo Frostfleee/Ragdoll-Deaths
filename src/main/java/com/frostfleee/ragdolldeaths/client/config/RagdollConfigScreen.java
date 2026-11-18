@@ -47,7 +47,8 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 		list.addSmall(
 				toggle("enabled", c.enabled, v -> c.enabled = v),
 				toggle("playerRagdolls", c.playerRagdolls, v -> c.playerRagdolls = v),
-				slider("lifetimeTicks", RagdollConfig.MIN_LIFETIME_TICKS, RagdollConfig.MAX_LIFETIME_TICKS, c.lifetimeTicks, RagdollConfigScreen::seconds, v -> c.lifetimeTicks = v),
+				slider("bodyLifetimeTicks", 1, RagdollConfig.MAX_BODY_LIFETIME_TICKS / 20, c.bodyLifetimeTicks / 20,
+						v -> Component.translatable(KEY + "wholeSeconds", v), v -> c.bodyLifetimeTicks = v * 20),
 				percent("animationSpeed", 50, 200, c.animationSpeed, v -> c.animationSpeed = v),
 				slider("maxRenderDistance", 8, 256, (int) c.maxRenderDistance, v -> Component.translatable(KEY + "blocks", v), v -> c.maxRenderDistance = v),
 				slider("maxActiveRagdolls", 4, 256, c.maxActiveRagdolls, v -> Component.literal(Integer.toString(v)), v -> c.maxActiveRagdolls = v),
@@ -56,7 +57,6 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 		Compat.addHeader(list, header("physics"), font);
 		list.addSmall(
 				toggle("physicsRagdolls", c.physicsRagdolls, v -> c.physicsRagdolls = v),
-				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
 				quality(c),
 				slider("maxBodies", 4, 128, c.maxBodies, v -> Component.literal(Integer.toString(v)), v -> c.maxBodies = v),
 				percent("explosionStrength", 0, 200, c.explosionStrength, v -> c.explosionStrength = v),
@@ -66,13 +66,18 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				toggle("skeletonsBreak", c.skeletonsBreak, v -> c.skeletonsBreak = v),
 				toggle("impactSounds", c.impactSounds, v -> c.impactSounds = v),
 				toggle("impactParticles", c.impactParticles, v -> c.impactParticles = v),
+				toggle("pushBodies", c.pushBodies, v -> c.pushBodies = v),
 				toggle("deathCamera", c.deathCamera, v -> c.deathCamera = v),
 				slider("deathCameraDistance", 3, 20, (int) Math.round(c.deathCameraDistance * 2.0),
 						v -> Component.translatable(KEY + "blocks", String.format(Locale.ROOT, "%.1f", v / 2.0)), v -> c.deathCameraDistance = v / 2.0),
 				toggle("deathCameraCircles", c.deathCameraCircles, v -> c.deathCameraCircles = v),
-				toggle("playerBodyUntilRespawn", c.playerBodyUntilRespawn, v -> c.playerBodyUntilRespawn = v),
-				slider("bodyLifetimeTicks", 1, RagdollConfig.MAX_BODY_LIFETIME_TICKS / 20, c.bodyLifetimeTicks / 20,
-						v -> Component.translatable(KEY + "wholeSeconds", v), v -> c.bodyLifetimeTicks = v * 20));
+				toggle("playerBodyUntilRespawn", c.playerBodyUntilRespawn, v -> c.playerBodyUntilRespawn = v));
+
+		// Features still being worked on, off by default.
+		Compat.addHeader(list, header("beta"), font);
+		list.addSmall(
+				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
+				toggle("blood", c.blood, v -> c.blood = v));
 
 		Compat.addHeader(list, header("motion"), font);
 		list.addSmall(
@@ -167,9 +172,5 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 
 	private static <T> OptionInstance.TooltipSupplier<T> tooltip(String name) {
 		return OptionInstance.cachedConstantTooltip(Component.translatable(KEY + name + ".tooltip"));
-	}
-
-	private static Component seconds(int ticks) {
-		return Component.translatable(KEY + "seconds", String.format(Locale.ROOT, "%.2f", ticks / 20.0), ticks);
 	}
 }

@@ -227,7 +227,7 @@ class JointChoreographyTest {
 		RagdollAnimator.compute(zombie, config, land + 8.0, pose, joints);
 		assertEquals(Math.PI / 2.0, Math.abs(pose.tipAngle), Math.toRadians(8.0), "lies flat after the impact");
 		assertTrue(pose.offsetY >= -12.0, "never passes through the floor");
-		assertEquals(land + config.lifetimeTicks, RagdollAnimator.endTick(zombie, config), 1.0E-9);
+		assertEquals(land + config.bodyLifetimeTicks, RagdollAnimator.endTick(zombie, config), 1.0E-9);
 	}
 
 	@Test

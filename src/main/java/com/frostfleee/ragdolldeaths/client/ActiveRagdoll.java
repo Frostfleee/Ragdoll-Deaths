@@ -83,20 +83,17 @@ final class ActiveRagdoll {
 			// take their own path; a mob that just died in the air falls exactly like its entity.
 			followEntity = profile.freeFall() && !profile.blasted() && !entity.isPassenger();
 		}
-		if (physical(entity, profile, config)) {
+		if (config.physicsRagdolls) {
 			physics = new PhysicsRagdoll(entity);
+			if (entity.isPassenger() && !profile.blasted()) {
+				// A rider (EntityFilter lets through only one on a living mount) is still seated on the server, so its
+				// own last move is the mount's: it leaves the seat with the throw the classic death uses, per second.
+				physics.seatThrow = new Vec3(profile.velocityX(), profile.velocityY(), profile.velocityZ()).scale(20.0);
+			}
+			physics.bleeds = Blood.bleeds(entity, profile) && !entity.isInLava();
+		} else if (config.blood && Blood.bleeds(entity, profile) && !entity.isInLava()) {
+			Blood.blow(entity, 1.0);
 		}
-	}
-
-	/**
-	 * Which deaths get a physics body: every mob except a shulker and a rider still on its mount, which keep their
-	 * animation. Skeletons, slimes, the snow golem, blazes and breezes get one with extras (see SpecialBodies).
-	 */
-	private static boolean physical(LivingEntity entity, DeathProfile profile, RagdollConfig config) {
-		if (!config.physicsRagdolls || entity.isPassenger()) {
-			return false;
-		}
-		return true;
 	}
 
 	boolean isPhysical() {
@@ -323,8 +320,7 @@ final class ActiveRagdoll {
 			state.hasRedOverlay = false;
 		}
 		if (physics.charredWhole()) {
-			// Unlit as well as tinted: armor, clothes and other layers take the light but not the tint.
-			Compat.setLight(state, 0);
+			// Tinted, not unlit: armor and held items burn on their own (or not at all, when they don't burn in lava).
 			state.hasRedOverlay = false;
 		}
 		RagdollRenderData.set(state, pose, null);
@@ -399,8 +395,14 @@ final class ActiveRagdoll {
 			if (physics.failed || physics.retired || expired || config.lavaSink && physics.lavaTicks > LAVA_GONE_TICKS) {
 				return true;
 			}
-			// A body whose chunk was unloaded has no ground left under it.
-			return physics.built() && !entity.level().isLoaded(BlockPos.containing(physics.torsoPosition(1.0F)));
+			// A body whose chunk was unloaded has no ground left under it. Only the chunk is looked at, not the height: the
+			// game counts everything above the build limit (and below the bottom) as never loaded, and a mob that died up
+			// there was let go on its first tick instead of falling.
+			if (!physics.built()) {
+				return false;
+			}
+			net.minecraft.world.phys.Vec3 torso = physics.torsoPosition(1.0F);
+			return !entity.level().getChunkSource().hasChunk(Mth.floor(torso.x) >> 4, Mth.floor(torso.z) >> 4);
 		}
 		if (untilRespawn) {
 			return false;

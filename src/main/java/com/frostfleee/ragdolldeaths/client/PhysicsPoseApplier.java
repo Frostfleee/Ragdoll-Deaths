@@ -12,10 +12,29 @@ import org.joml.Matrix4f;
  */
 public final class PhysicsPoseApplier {
 	/**
-	 * The render state of the ragdoll mob being drawn right now, for game versions that pose each model as it is
-	 * drawn (1.21.2 to 1.21.8); null otherwise. Drawing runs on one thread.
+	 * The render state of the ragdoll mob being drawn (or, from 1.21.9, submitted) right now; null otherwise. Armor
+	 * and held-item layers ask it which body they belong to. Drawing runs on one thread.
 	 */
 	public static Object drawing;
+
+	private static PhysicsRagdoll drawingPhysics() {
+		return drawing instanceof EntityRenderState state ? RagdollRenderData.physics(state) : null;
+	}
+
+	/**
+	 * The texture to draw an armor (or other layer) piece with while a physics body is drawn: its burnt copy once lava
+	 * has reached it. Anything else keeps its texture.
+	 */
+	public static <T> T layerTexture(T texture, Model model, net.minecraft.world.item.ItemStack stack) {
+		PhysicsRagdoll ragdoll = drawingPhysics();
+		return ragdoll == null || ragdoll.failed ? texture : ragdoll.layerTexture(texture, model, stack);
+	}
+
+	/** The light to draw a held item with: none (burnt black) when the hand holding it went into lava, else its own. */
+	public static int heldItemLight(net.minecraft.world.entity.HumanoidArm arm, int light) {
+		PhysicsRagdoll ragdoll = drawingPhysics();
+		return ragdoll != null && !ragdoll.failed && ragdoll.built() && ragdoll.heldItemBurnt(arm) ? 0 : light;
+	}
 
 	/** How many times a model was posed onto a physics body; the self-test reports it to show bodies are drawn. */
 	public static long writes;

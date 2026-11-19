@@ -84,4 +84,12 @@ abstract class LivingEntityRendererMixin {
 	private float ragdolldeaths$replaceVanillaFlip(float flipDegrees, @Local(argsOnly = true) LivingEntityRenderState state) {
 		return RagdollRenderData.pose(state) != null ? 0.0F : flipDegrees;
 	}
+
+	// The arrows stuck in the mob, placed on the model as it is posed for this frame.
+	@Inject(
+			method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V", ordinal = 0))
+	private void ragdolldeaths$stuckArrows(LivingEntityRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera, CallbackInfo ci) {
+		com.frostfleee.ragdolldeaths.client.Compat.stuckArrows(((LivingEntityRenderer<?, ?, ?>) (Object) this).getModel(), state, poseStack, collector);
+	}
 }

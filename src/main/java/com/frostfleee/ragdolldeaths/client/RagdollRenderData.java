@@ -62,6 +62,15 @@ public final class RagdollRenderData {
 		int ragdolldeaths$light();
 
 		void ragdolldeaths$setLight(int light);
+
+		/** How many stuck arrows to draw on this mob, and the mob's id, which decides where they sit. */
+		int ragdolldeaths$arrows();
+
+		int ragdolldeaths$arrowSeed();
+
+		boolean ragdolldeaths$arrowsOnDead();
+
+		void ragdolldeaths$setArrows(int count, int seed, boolean dead);
 	}
 
 	/** Forgets everything about the last body this state was filled for: some versions reuse one state per renderer. */
@@ -69,6 +78,23 @@ public final class RagdollRenderData {
 		set(state, null, null);
 		setPhysics(state, null);
 		((Holder) state).ragdolldeaths$setLight(-1);
+		setArrows(state, 0, 0, false);
+	}
+
+	public static int arrows(EntityRenderState state) {
+		return ((Holder) state).ragdolldeaths$arrows();
+	}
+
+	public static int arrowSeed(EntityRenderState state) {
+		return ((Holder) state).ragdolldeaths$arrowSeed();
+	}
+
+	public static boolean arrowsOnDead(EntityRenderState state) {
+		return ((Holder) state).ragdolldeaths$arrowsOnDead();
+	}
+
+	static void setArrows(EntityRenderState state, int count, int seed, boolean dead) {
+		((Holder) state).ragdolldeaths$setArrows(count, seed, dead);
 	}
 
 	/** The light to draw the state with: the body's own when it set one, else the light the game passes. */

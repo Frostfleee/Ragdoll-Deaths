@@ -17,6 +17,34 @@ abstract class EntityRenderStateMixin implements RagdollRenderData.Holder {
 	private Object ragdolldeaths$physics;
 	@Unique
 	private int ragdolldeaths$light = -1;
+	@Unique
+	private int ragdolldeaths$arrows;
+	@Unique
+	private int ragdolldeaths$arrowSeed;
+	@Unique
+	private boolean ragdolldeaths$arrowsOnDead;
+
+	@Override
+	public int ragdolldeaths$arrows() {
+		return ragdolldeaths$arrows;
+	}
+
+	@Override
+	public int ragdolldeaths$arrowSeed() {
+		return ragdolldeaths$arrowSeed;
+	}
+
+	@Override
+	public boolean ragdolldeaths$arrowsOnDead() {
+		return ragdolldeaths$arrowsOnDead;
+	}
+
+	@Override
+	public void ragdolldeaths$setArrows(int count, int seed, boolean dead) {
+		ragdolldeaths$arrows = count;
+		ragdolldeaths$arrowSeed = seed;
+		ragdolldeaths$arrowsOnDead = dead;
+	}
 
 	@Override
 	public int ragdolldeaths$light() {

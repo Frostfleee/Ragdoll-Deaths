@@ -53,9 +53,13 @@ public final class RagdollConfig {
 	 * it is drawn only on this client, after the server has removed the mob.
 	 */
 	public int bodyLifetimeTicks = DEFAULT_BODY_LIFETIME_TICKS;
+	/** Arrows that hit a mob stay in its dead body, as they do on players, until the body disappears. */
+	public boolean stuckArrows = true;
+	/** With {@link #stuckArrows} on, living mobs show the arrows stuck in them too. */
+	public boolean stuckArrowsOnLiving = false;
 	/**
-	 * Beta, off by default: cuts arms and legs in two so they bend at a knee or an elbow. Bodies crumple more
-	 * convincingly, at the cost of ten parts a body instead of six and limbs that are no longer vanilla's one piece.
+	 * Off by default: cuts arms and legs in two so they bend at a knee or an elbow, the way a person's do. Bodies crumple
+	 * more convincingly, at the cost of ten parts a body instead of six and limbs that are no longer vanilla's one piece.
 	 */
 	public boolean kneesAndElbows = false;
 	/** How long a dying body's muscles keep pulling before it is completely limp, in seconds. Zero is limp at once. */

@@ -1,0 +1,24 @@
+package com.frostfleee.ragdolldeaths.mixin;
+
+import com.frostfleee.ragdolldeaths.client.PhysicsPoseApplier;
+import net.minecraft.client.renderer.entity.layers.SlimeOuterLayer;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+
+/** A slime's outer jelly burns where lava touched it (see Scorch). */
+@Mixin(SlimeOuterLayer.class)
+abstract class SlimeOuterBurnMixin {
+	@Shadow
+	@Final
+	@SuppressWarnings("rawtypes")
+	private net.minecraft.client.model.monster.slime.SlimeModel model;
+
+	@ModifyArg(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/SlimeRenderState;FF)V",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/rendertype/RenderTypes;entityTranslucent(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/rendertype/RenderType;"))
+	private net.minecraft.resources.Identifier ragdolldeaths$burnt(net.minecraft.resources.Identifier texture) {
+		return PhysicsPoseApplier.layerTexture(texture, model, null);
+	}
+}

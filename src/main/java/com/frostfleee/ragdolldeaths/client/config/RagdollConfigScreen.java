@@ -53,6 +53,9 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				slider("maxRenderDistance", 8, 256, (int) c.maxRenderDistance, v -> Component.translatable(KEY + "blocks", v), v -> c.maxRenderDistance = v),
 				slider("maxActiveRagdolls", 4, 256, c.maxActiveRagdolls, v -> Component.literal(Integer.toString(v)), v -> c.maxActiveRagdolls = v),
 				toggle("hideDeathTint", c.hideDeathTint, v -> c.hideDeathTint = v));
+		list.addSmall(
+				toggle("stuckArrows", c.stuckArrows, v -> c.stuckArrows = v),
+				toggle("stuckArrowsOnLiving", c.stuckArrowsOnLiving, v -> c.stuckArrowsOnLiving = v));
 
 		Compat.addHeader(list, header("physics"), font);
 		list.addSmall(
@@ -63,6 +66,7 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				slider("muscleSeconds", 0, 50, (int) Math.round(c.muscleSeconds * 10.0),
 						v -> Component.translatable(KEY + "wholeSeconds", String.format(Locale.ROOT, "%.1f", v / 10.0)), v -> c.muscleSeconds = v / 10.0),
 				toggle("reflexes", c.reflexes, v -> c.reflexes = v),
+				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
 				toggle("skeletonsBreak", c.skeletonsBreak, v -> c.skeletonsBreak = v),
 				toggle("impactSounds", c.impactSounds, v -> c.impactSounds = v),
 				toggle("impactParticles", c.impactParticles, v -> c.impactParticles = v),
@@ -75,9 +79,7 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 
 		// Features still being worked on, off by default.
 		Compat.addHeader(list, header("beta"), font);
-		list.addSmall(
-				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
-				toggle("blood", c.blood, v -> c.blood = v));
+		list.addSmall(toggle("blood", c.blood, v -> c.blood = v));
 
 		Compat.addHeader(list, header("motion"), font);
 		list.addSmall(

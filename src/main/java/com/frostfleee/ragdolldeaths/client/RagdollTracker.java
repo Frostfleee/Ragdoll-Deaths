@@ -43,7 +43,11 @@ public final class RagdollTracker {
 
 	public void onStateCreated(EntityRenderer renderer, Entity entity, EntityRenderState state, float partialTicks) {
 		RagdollRenderData.clear(state);
-		if (!(entity instanceof LivingEntity living) || living.deathTime <= 0) {
+		if (!(entity instanceof LivingEntity living)) {
+			return;
+		}
+		StuckArrows.note(state, living);
+		if (living.deathTime <= 0) {
 			return;
 		}
 		if (!(state instanceof LivingEntityRenderState livingState) || !(renderer instanceof LivingEntityRenderer)) {
@@ -117,8 +121,8 @@ public final class RagdollTracker {
 			// and lasts its lifetime (isFinished) or until the respawn.
 			boolean stale = ragdoll.age(tick, 0.0F) > STALE_AFTER_TICKS && !(ragdoll.entity instanceof net.minecraft.world.entity.player.Player);
 			boolean gone = ragdoll.entity.isRemoved() || !ragdoll.entity.isDeadOrDying() || stale;
-			if (gone && ragdoll.entity.isRemoved() && keepsDeadPlayer(ragdoll)) {
-				// removed with no unload event (the dead local player on 1.21.x): kept, as onUnload would
+			if (gone && ragdoll.entity.isRemoved() && (ragdoll.keptAsGhost() || keepsDeadPlayer(ragdoll))) {
+				// removed with no unload event yet (or none at all, for the dead local player on 1.21.x): kept, as onUnload would
 				ragdoll.keepAsGhost();
 				ragdoll.becomeGhost(tick);
 				ghosts.put(ragdoll.entity, ragdoll);

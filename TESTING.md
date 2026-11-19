@@ -15,6 +15,8 @@ Every living mob in Minecraft 26.3, grouped by the animation code it uses. Check
 
 **Every loader and game version.** `./selftest-all.sh all` starts the game once per release jar group (Fabric, Quilt, NeoForge and Forge, 1.21 to 26.3) with `-Dragdolldeaths.selftest=true`. Each run creates a world, kills fifteen mobs (zombie, skeleton, creeper, spider, cow, shulker, slime, villager, enderman, piglin, horse, wolf, cat, pillager, vindicator) on a stone stage in the sky, carries one more body 90 blocks from where its mob died, kills the player, respawns, takes three screenshots, and prints one line: `PASS` when every mob became a physics body with nothing inside a block, the bodies were drawn, the dead player's body was there and followed by the death camera, it outlasted the body lifetime (Player Body Until Respawn), it was gone after the respawn, and the far-carried body was still drawn. With `EMF=1` in front, it runs with Entity Model Features and resource packs made for it (Fresh Animations, AL's packs) installed, then takes them out again. `EDGES=1` adds the oldest version of the groups built against a newer one; `./selftest.sh <loader> <-P...>` runs a single one (see `selftest-all.sh` for the values). Quilt runs start the game on the Quilt loader itself (`-PquiltRun`).
 
+**Before calling a version finished:** `./release-check.sh` runs everything above, checks that nothing was left out, builds the release jars and checks them. It must end with `RELEASE CHECK PASSED` (see `CLAUDE.md`). `./release-check.sh --quick` is the fast version without the game.
+
 ## Situations
 
 | Code | How to cause it |
@@ -198,43 +200,43 @@ The body must keep falling with its limbs trailing up, play its death only after
 
 Use `/summon creeper ~ ~ ~5 {ExplosionRadius:3}` and wait for it to blow up near a group of mobs, or light TNT beside them. Try a mob right next to the blast and one about 4 blocks away.
 
-- [ ] Zombie: thrown far away from the blast in a high arc (about 35 blocks right next to it, about 10 at the edge of the blast), falls over in the air (front or back, depending on which way it faced), lands with a bounce and slides to a stop
-- [ ] The closer mob flies further than the farther one
-- [ ] TNT (whose source is gone by the time it explodes) still throws bodies away from it, not toward it
-- [ ] Cow or horse: thrown and lands on its side, nothing sinks into the ground
-- [ ] Skeleton: thrown, then comes apart on landing
-- [ ] A mob next to a wall is stopped by the wall, not pushed through it
-- [ ] Indoors (under a low ceiling): the body hits the ceiling and drops to the floor, never stuck up against it
-- [ ] A mob blasted off a ledge lands on the floor below and lies there
-- [ ] Iron Golem or Ravager: thrown noticeably less far than a zombie at the same distance
-- [ ] A body still in the air after 3 seconds keeps flying until it lands, then vanishes in its puff of smoke where it lay
-- [ ] Creeper explosion in water: the water death plays (no launch)
+- [x] Zombie: thrown far away from the blast in a high arc (about 35 blocks right next to it, about 10 at the edge of the blast), falls over in the air (front or back, depending on which way it faced), lands with a bounce and slides to a stop
+- [x] The closer mob flies further than the farther one
+- [x] TNT (whose source is gone by the time it explodes) still throws bodies away from it, not toward it
+- [x] Cow or horse: thrown and lands on its side, nothing sinks into the ground
+- [x] Skeleton: thrown, then comes apart on landing
+- [x] A mob next to a wall is stopped by the wall, not pushed through it
+- [x] Indoors (under a low ceiling): the body hits the ceiling and drops to the floor, never stuck up against it
+- [x] A mob blasted off a ledge lands on the floor below and lies there
+- [x] Iron Golem or Ravager: thrown noticeably less far than a zombie at the same distance
+- [x] A body still in the air after 3 seconds keeps flying until it lands, then vanishes in its puff of smoke where it lay
+- [x] Creeper explosion in water: the water death plays (no launch)
 
 ## 15. New in 1.1.0: thrown riders
 
 `/summon skeleton_horse ~ ~ ~ {Passengers:[{id:"minecraft:skeleton"}]}`, `/summon spider ~ ~ ~ {Passengers:[{id:"minecraft:skeleton"}]}`, `/summon chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b}]}`, `/summon ravager ~ ~ ~ {Passengers:[{id:"minecraft:pillager"}]}`
 
-- [ ] Skeleton on a skeleton horse: thrown off away from the hit, legs straighten out of the sitting pose, lands with the fall impact and falls apart
-- [ ] Spider jockey, chicken jockey and ravager rider: the same, each landing beside its mount
-- [ ] Kill the rider while its mount is walking or galloping: it is carried forward a little as it falls
-- [ ] Player on a horse (third person): thrown off and lands
-- [ ] The mount is not affected and keeps moving
-- [ ] Rider in a boat or minecart: vanilla death, unchanged
-- [ ] *Thrown Riders* off: riders keep the vanilla death
+- [x] Skeleton on a skeleton horse: thrown off away from the hit, legs straighten out of the sitting pose, lands with the fall impact and falls apart
+- [x] Spider jockey, chicken jockey and ravager rider: the same, each landing beside its mount
+- [x] Kill the rider while its mount is walking or galloping: it is carried forward a little as it falls
+- [x] Player on a horse (third person): thrown off and lands
+- [x] The mount is not affected and keeps moving
+- [x] Rider in a boat or minecart: vanilla death, unchanged
+- [x] *Thrown Riders* off: riders keep the vanilla death
 
 ## 16. New in 1.1.0: uneven ground and culling
 
-- [ ] A zombie killed at the bottom of a staircase, hit so it falls up the stairs: it rests tilted up along the steps, head on a higher step, nothing inside the blocks
-- [ ] A zombie on a slab edge falling toward a lower block: it drapes down over the edge, at most a moderate angle
-- [ ] A cow killed beside a 1-block step, falling onto its side against it: the body leans up on the step
-- [ ] A mob killed on flat ground still lies perfectly flat (no tilt)
-- [ ] A mob killed in mid-hop on flat ground lies flat, not tipped downward
-- [ ] Ground changed during a fall: summon a zombie 20 blocks up, place blocks under it while it falls. It lands on the new blocks, not the old floor
-- [ ] A body thrown or pushed to the edge of the screen no longer vanishes early while you look at it (turn the camera so the mob's original spot is just off screen)
+- [x] A zombie killed at the bottom of a staircase, hit so it falls up the stairs: it rests tilted up along the steps, head on a higher step, nothing inside the blocks
+- [x] A zombie on a slab edge falling toward a lower block: it drapes down over the edge, at most a moderate angle
+- [x] A cow killed beside a 1-block step, falling onto its side against it: the body leans up on the step
+- [x] A mob killed on flat ground still lies perfectly flat (no tilt)
+- [x] A mob killed in mid-hop on flat ground lies flat, not tipped downward
+- [x] Ground changed during a fall: summon a zombie 20 blocks up, place blocks under it while it falls. It lands on the new blocks, not the old floor
+- [x] A body thrown or pushed to the edge of the screen no longer vanishes early while you look at it (turn the camera so the mob's original spot is just off screen)
 
 ## 17. New in 1.1.0: physics bodies
 
-Run the automatic scenes first: `RAGDOLL_SCENES=<names> ./gradlew runClientGameTest -PvisualTests`. Each scene saves numbered screenshots and logs, for every body, whether it came to rest and whether any part ended inside a block (the test fails if one did). `RAGDOLL_DEBUG=1` adds how each blow was read and the physics time per tick. `RAGDOLL_KNEES=1` turns the knees beta on; `RAGDOLL_LIMP=1` turns dying muscles off.
+Run the automatic scenes first: `RAGDOLL_SCENES=<names> ./gradlew runClientGameTest -PvisualTests`. Each scene saves numbered screenshots and logs, for every body, whether it came to rest and whether any part ended inside a block (the test fails if one did). `RAGDOLL_DEBUG=1` adds how each blow was read and the physics time per tick. `RAGDOLL_KNEES=1` turns Knees and Elbows on; `RAGDOLL_LIMP=1` turns dying muscles off.
 
 | Scene | What must happen |
 |---|---|
@@ -263,17 +265,33 @@ By hand, check what the scenes cannot: the sounds (thud, splash, bone clatter), 
 
 The self-test (`./selftest-all.sh`) checks most of these by itself: a skeleton killed on its skeleton horse, a mannequin, a zombie in lava with a netherite helmet, an iron chestplate and an iron sword, the player walking through a cow's body, and a zombie killed above the build limit.
 
-- [ ] Skeleton on a skeleton horse, spider jockey, pillager on a ravager, player on a horse: each rider is a physics body that leaves the seat with the mount's momentum, pushed away from the blow, and tumbles off
-- [ ] A zombie in iron armor holding an iron sword knocked into lava: the armor is burnt only where it was under the lava, the sword is burnt black once its hand went in
-- [ ] The same with netherite armor and a netherite sword: they keep their look
-- [ ] Horse armor and a llama carpet in lava burn the same way
-- [ ] *Push Dead Bodies* (on by default): walk into a resting body and it slides along in front of you; a mob walking into one pushes it too; you walk exactly as without the mod. Off: bodies stay put
-- [ ] Above the build limit: on a superflat world, `/tp @p ~ ~380 ~` and kill a mob up there, then die yourself: both bodies fall to the ground (they used to freeze, shake and vanish)
-- [ ] NeoForge 26.2 and 26.3: no warning about the mod at startup
-- [ ] Settings screen: *Body Lifetime* is in General (one slider, 1 to 60 s, 5 s by default); there is no *Physics Body Lifetime*; a *Beta* section after Physics holds *Knees and Elbows (Beta)* and *Blood (Beta)*; *Death Camera* is on after *Reset to Defaults*
-- [ ] *Body Lifetime* at 2 s, with Physics Bodies on and then off: bodies vanish about 2 s after death both ways
-- [ ] *Blood (Beta)* off (the default): no blood anywhere
-- [ ] *Blood (Beta)* on: a zombie hit hard sprays from where it was hit, drips for about two seconds, splatters on a hard landing; a skeleton, iron golem, slime, blaze and mannequin never bleed; nothing bleeds in lava
+- [x] Skeleton on a skeleton horse, spider jockey, pillager on a ravager, player on a horse: each rider is a physics body that leaves the seat with the mount's momentum, pushed away from the blow, and tumbles off
+- [x] A zombie in iron armor holding an iron sword knocked into lava: the armor is burnt only where it was under the lava, the sword is burnt black once its hand went in
+- [x] The same with netherite armor and a netherite sword: they keep their look
+- [x] Horse armor and a llama carpet in lava burn the same way
+- [x] *Push Dead Bodies* (on by default): walk into a resting body and it slides along in front of you; a mob walking into one pushes it too; you walk exactly as without the mod. Off: bodies stay put
+- [x] Above the build limit: on a superflat world, `/tp @p ~ ~380 ~` and kill a mob up there, then die yourself: both bodies fall to the ground (they used to freeze, shake and vanish)
+- [x] NeoForge 26.2 and 26.3: no warning about the mod at startup
+- [x] Settings screen: *Body Lifetime* is in General (one slider, 1 to 60 s, 5 s by default); there is no *Physics Body Lifetime*; a *Beta* section after Physics holds *Blood (Beta)*; *Death Camera* is on after *Reset to Defaults*
+- [x] *Body Lifetime* at 2 s, with Physics Bodies on and then off: bodies vanish about 2 s after death both ways
+- [x] *Blood (Beta)* off (the default): no blood anywhere
+- [x] *Blood (Beta)* on: a zombie hit hard sprays from where it was hit, drips for about two seconds, splatters on a hard landing; a skeleton, iron golem, slime, blaze and mannequin never bleed; nothing bleeds in lava
+
+## 19. New in 1.2.0
+
+The self-test (`./selftest-all.sh`) checks most of this by itself: three arrows in every mob, drawn once it is dead and on the living only with the setting on, a horse with white markings killed in lava, and a zombie with knees and elbows falling onto stone. For a close look, `RAGDOLL_SCENES=knees,arrows,markings ./gradlew runClientGameTest -PvisualTests`.
+
+- [x] Shoot a zombie, a cow and a spider dead: the arrows stay in the bodies, follow the part they are in as the body falls, and go when the body vanishes
+- [x] *Stuck Arrows on Bodies* off: no arrows on bodies, and *Stuck Arrows on Living Mobs* has no effect
+- [x] *Stuck Arrows on Living Mobs* on: a mob you shot shows its arrows while alive; they drop out one by one, as on players
+- [x] Players keep the game's own stuck arrows, with no second set on top
+- [x] *Knees and Elbows* is in the Physics section, without "(Beta)", and off after *Reset to Defaults*
+- [x] With it on, a zombie, a villager with free arms (a pillager) and a player: knees fold backward only, elbows forward only, never past about 89 degrees and never the wrong way
+- [x] From every side, at every bend: no gap at a knee or elbow, and no way to see inside a limb. Armor on the limb too
+- [x] A skeleton with it on still breaks apart
+- [x] A player with arrows in them, with it on: sleeves and trouser legs bend with the limb, and an arrow in a shin or forearm follows it
+- [x] On 1.21 and 1.21.1, a zombie's hat stays on its head, and a player's sleeves, jacket and trouser legs stay on their limbs, with or without it
+- [x] In lava: a horse with white markings, a villager, a drowned, a stray, a sheep, a slime, a wolf with a collar and a tropical fish all burn on their second skin too, only where lava touched them
 
 ## Reporting
 

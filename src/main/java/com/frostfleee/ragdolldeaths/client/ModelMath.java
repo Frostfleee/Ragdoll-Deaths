@@ -38,12 +38,26 @@ final class ModelMath {
 		part.x = m.m30() * 16.0F;
 		part.y = m.m31() * 16.0F;
 		part.z = m.m32() * 16.0F;
-		part.xScale = (float) Math.sqrt(m.m00() * m.m00() + m.m01() * m.m01() + m.m02() * m.m02());
-		part.yScale = (float) Math.sqrt(m.m10() * m.m10() + m.m11() * m.m11() + m.m12() * m.m12());
-		part.zScale = (float) Math.sqrt(m.m20() * m.m20() + m.m21() * m.m21() + m.m22() * m.m22());
-		m.getNormalizedRotation(rotation).getEulerAnglesZYX(angles);
-		part.xRot = angles.x;
-		part.yRot = angles.y;
-		part.zRot = angles.z;
+		float sx = (float) Math.sqrt(m.m00() * m.m00() + m.m01() * m.m01() + m.m02() * m.m02());
+		float sy = (float) Math.sqrt(m.m10() * m.m10() + m.m11() * m.m11() + m.m12() * m.m12());
+		float sz = (float) Math.sqrt(m.m20() * m.m20() + m.m21() * m.m21() + m.m22() * m.m22());
+		part.xScale = sx;
+		part.yScale = sy;
+		part.zScale = sz;
+		if (sx < 1.0E-6F || sy < 1.0E-6F || sz < 1.0E-6F) {
+			return;
+		}
+		// The angles straight from the matrix, for the order the part turns in (Z, then Y, then X). This does not depend on
+		// the part's scale or on the math library of the game version, and stays exact when the Y turn is near a right angle.
+		double r00 = m.m00() / sx, r01 = m.m01() / sx, r02 = m.m02() / sx;
+		double cosY = Math.sqrt(r00 * r00 + r01 * r01);
+		part.yRot = (float) Math.atan2(-r02, cosY);
+		if (cosY > 1.0E-5) {
+			part.zRot = (float) Math.atan2(r01, r00);
+			part.xRot = (float) Math.atan2(m.m12() / sy, m.m22() / sz);
+		} else {
+			part.zRot = 0.0F;
+			part.xRot = (float) Math.atan2(-m.m21() / sz, m.m11() / sy);
+		}
 	}
 }

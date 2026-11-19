@@ -20,6 +20,10 @@ case $loader in
 	forge) dir=forge; extra=("-Pbuild_root=$HOME/.ragdolldeaths-selftest") ;;
 esac
 log=$(mktemp)
+# The game stays off the screen and away from the mouse for the whole run (see test-window-guard.ps1).
+guard_stop=$(mktemp -u)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$PWD/test-window-guard.ps1")" "$(cygpath -w "$guard_stop")" > /dev/null 2>&1 &
+trap 'touch "$guard_stop"' EXIT
 if [ -n "${EMF:-}" ]; then
 	case $loader in
 		fabric26|quilt26) run=run; emfloader=fabric ;;
@@ -56,8 +60,16 @@ if [ -n "${EMF:-}" ]; then
 	(cd "$cache/packs" && ls *.zip) | while read -r pack; do rm -f "$run/resourcepacks/$pack"; done
 	mv "$run/options.txt.before-emf" "$run/options.txt"
 else
-	timeout 1500 ./gradlew -p "$dir" runClient -Pselftest "${extra[@]}" "$@" > "$log" 2>&1
-	rc=$?
+	# OneDrive sometimes locks files under build/; try again when that is what stopped the build.
+	for attempt in 1 2 3 4; do
+		timeout 1500 ./gradlew -p "$dir" runClient -Pselftest "${extra[@]}" "$@" > "$log" 2>&1
+		rc=$?
+		grep -aqE "stale outputs|Unable to delete|being used by another process|Cannot snapshot|unreadable" "$log" || break
+		rm -rf "$dir/build/classes" "$dir/build/resources" 2> /dev/null
+		sleep 5
+	done
 fi
-grep -a "SELFTEST RESULT\|SELFTEST title\|SELFTEST in world\|SELFTEST [0-9]\|Loading Minecraft .* with \(Fabric\|Quilt\)\|Mixing .* from ragdolldeaths\|Exception\|Disabling ragdolls\|Physics ragdoll failed" "$log" | grep -v "^\s*at " | sed 's/^.*\(SELFTEST\)/\1/' | cut -c1-220 | head -40
+grep -a "SELFTEST title\|SELFTEST in world\|SELFTEST [0-9]\|Loading Minecraft .* with \(Fabric\|Quilt\)\|Mixing .* from ragdolldeaths\|Exception\|Disabling ragdolls\|Physics ragdoll failed" "$log" | grep -v "^\s*at " | sed 's/^.*\(SELFTEST\)/\1/' | cut -c1-220 | head -40
+# Last and uncut: selftest-all.sh reads this line, however much came before it.
+grep -a "SELFTEST RESULT" "$log" | sed 's/^.*\(SELFTEST\)/\1/'
 echo "mixins applied: $(grep -ac 'from ragdolldeaths\|from #ragdolldeaths' "$log")  gradle rc=$rc  log=$log"

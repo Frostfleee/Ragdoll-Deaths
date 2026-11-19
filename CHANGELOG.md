@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0
+
+### New
+- **Stuck Arrows on Bodies** (setting, on by default). Arrows that hit a mob stay in its dead body, the way they show on players, follow the part they are in as the body falls, and go when the body disappears.
+- **Stuck Arrows on Living Mobs** (setting, off by default). With the first setting on, living mobs show the arrows stuck in them too. It is only drawn on your screen, like everything else in the mod.
+
+### Changed
+- **Knees and Elbows are out of beta** (still off by default, now in the Physics section). They bend only the way a person's do: the knee hinges at the front of the leg and the elbow at the back of the arm, up to 89 degrees one way and not at all the other. The two halves of a limb stay joined along that edge, so you can no longer see into a limb through the cut. A player's sleeves and trouser legs bend with the limb, and the arrows and bee stingers stuck in a player follow it too.
+
+### Fixed
+- **The Forge jar for 1.21 and 1.21.1 did not load on Minecraft 1.21.** Forge for 1.21 could not start the mod, and the game opened with a loading error. It now loads on both.
+- **Limbs could shake or blur while a body landed.** Arms and legs could flick back and forth very fast for the first second after death. They now ease after the physics and stay attached at their joints. This also fixes knees and elbows flickering where the two halves overlap.
+- **A body could vanish early.** If the game removed a dead mob or player just before the mod was told, a body that should have stayed was dropped.
+- **A mob's second skin did not burn in lava.** A horse's white markings, a villager's clothes, the outer layer of a drowned or a stray, a sheep's wool, a slime's outer jelly, collars and a tropical fish's pattern stayed untouched on a burnt body. They now burn exactly where lava touched them, like the skin under them.
+- **Hats, sleeves, jackets and trouser legs stayed with the torso on bodies** (1.21 and 1.21.1 only). They now follow the head or limb they cover.
+- Bodies in lava now take turns working out which pixels burn, so several of them at once cost less time.
+
 ## 1.1.3
 
 ### New

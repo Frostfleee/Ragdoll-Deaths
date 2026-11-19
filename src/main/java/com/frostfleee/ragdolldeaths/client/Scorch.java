@@ -29,8 +29,9 @@ import org.joml.Vector3f;
  * shows), placed in the world from where the body part is, and tested against the lava there. This only runs on
  * ticks when part of the body is in lava.
  *
- * <p>Armor and other layers (horse armor, a llama's carpet) burn the same way, each on a copy of its own texture,
- * placed by its own model: a layer model's parts sit at the same pivots as the mob's, so they follow the same bodies.
+ * <p>Armor and other layers (horse armor, a llama's carpet, a horse's markings, a villager's clothes) burn the same
+ * way, each on a copy of its own texture, placed by the model it is drawn on: a layer model's parts sit at the same
+ * pivots as the mob's, so they follow the same bodies.
  */
 final class Scorch {
 	/** How dark each stage is: the burnt pixels themselves, then the two rings around them. */
@@ -101,6 +102,16 @@ final class Scorch {
 			Compat.releaseTexture(id);
 			original.close();
 		}
+	}
+
+	/** Whether lava has reached any pixel of this texture. */
+	boolean anyBurnt() {
+		for (boolean pixel : burnt) {
+			if (pixel) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Burns every pixel of the body's skin that is under lava right now. */

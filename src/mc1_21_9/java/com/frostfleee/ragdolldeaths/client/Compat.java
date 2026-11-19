@@ -194,4 +194,23 @@ public final class Compat {
 		net.minecraft.client.Screenshot.grab(minecraft.gameDirectory, minecraft.getMainRenderTarget(), message -> {
 		});
 	}
+
+	private static net.minecraft.client.model.ArrowModel arrowModel;
+	private static final net.minecraft.client.renderer.entity.state.ArrowRenderState ARROW_STATE = new net.minecraft.client.renderer.entity.state.ArrowRenderState();
+
+	/** Draws the arrows stuck in a mob (see StuckArrows). */
+	public static void stuckArrows(net.minecraft.client.model.Model model, net.minecraft.client.renderer.entity.state.LivingEntityRenderState state, com.mojang.blaze3d.vertex.PoseStack pose,
+			net.minecraft.client.renderer.SubmitNodeCollector collector) {
+		int count = RagdollRenderData.arrows(state);
+		if (count <= 0) {
+			return;
+		}
+		if (arrowModel == null) {
+			arrowModel = new net.minecraft.client.model.ArrowModel(Minecraft.getInstance().getEntityModels().bakeLayer(net.minecraft.client.model.geom.ModelLayers.ARROW));
+		}
+		StuckArrows.draw(model, count, RagdollRenderData.arrowSeed(state), RagdollRenderData.arrowsOnDead(state), pose, (p, yRot, xRot) -> {
+			StuckArrows.turn(p, yRot, xRot);
+			collector.submitModel(arrowModel, ARROW_STATE, p, arrowModel.renderType(net.minecraft.client.renderer.entity.TippableArrowRenderer.NORMAL_ARROW_LOCATION), state.lightCoords, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+		});
+	}
 }

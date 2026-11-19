@@ -26,6 +26,7 @@ final class PhysicsHost {
 	private static final double SOFT_BUDGET_MS = 2.0, HARD_BUDGET_MS = 6.0;
 	private static final int STRAIN_TICKS = 20, OVERRUN_TICKS = 5;
 	private int strained, overrun;
+	private int burning, burningLastTick;
 	/** How many bodies have been let go early because the physics ran over its time; the self-test reports it. */
 	static int retiredForTime;
 	private final List<PhysicsRagdoll> ragdolls = new ArrayList<>();
@@ -84,12 +85,23 @@ final class PhysicsHost {
 		return ragdolls;
 	}
 
+	/**
+	 * Whether this body in lava may test its pixels this tick. The bodies in lava take turns, one a tick: testing a whole
+	 * skin is slow, and a burn showing a few ticks later does not matter.
+	 */
+	boolean scorchTurn() {
+		int index = burning++;
+		return burningLastTick <= 1 || ticks % burningLastTick == index % burningLastTick;
+	}
+
 	void tick() {
 		if (ragdolls.isEmpty()) {
 			return;
 		}
 		long start = System.nanoTime();
 		ticks++;
+		burningLastTick = burning;
+		burning = 0;
 		world.worldStamp++;
 		RagdollConfig config = ConfigStore.get();
 		world.substeps = switch (config.physicsQuality) {

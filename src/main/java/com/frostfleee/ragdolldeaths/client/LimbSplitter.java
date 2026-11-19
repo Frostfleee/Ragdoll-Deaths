@@ -21,6 +21,9 @@ import net.minecraft.core.Direction;
  * that pivots at the cut, built by slicing every face of the limb's cubes at the middle and keeping each half's
  * share of the texture. Both stay invisible, so a living mob is drawn exactly as before. Only while a ragdoll is
  * being drawn is the whole limb hidden and the two halves shown.
+ *
+ * <p>The lower half turns about the outer edge of the bend, the front of a knee or the back of an elbow, as in a
+ * person. The two halves stay joined along that edge and only overlap on the inner side, so no gap ever opens.
  */
 final class LimbSplitter {
 	static final String UPPER = "ragdolldeaths_upper";
@@ -29,9 +32,21 @@ final class LimbSplitter {
 	private static final float EDGE = 1.0E-3F;
 	/** Limbs shorter than this many pixels, or not clearly longer than they are thick, are left whole. */
 	private static final float MIN_LENGTH = 6.0F;
+	/** The lower half is a hair narrower: where the halves overlap at a bend, their sides would otherwise flicker. */
+	private static final float LOWER_WIDTH = 0.985F;
 
-	/** A limb that has halves. {@code hiddenBefore} is whether the game itself had the limb's cubes hidden. */
-	record Split(ModelPart limb, ModelPart upper, ModelPart lower, boolean hiddenBefore) {
+	/**
+	 * A limb that has halves.
+	 *
+	 * @param thickness the limb's size front to back, in pixels
+	 * @param hiddenBefore whether the game itself had the limb's cubes hidden
+	 * @param overlays the second skin on the limb (a player's sleeve or trouser leg), cut in two with it
+	 */
+	record Split(ModelPart limb, ModelPart upper, ModelPart lower, float thickness, boolean hiddenBefore, List<Overlay> overlays) {
+	}
+
+	/** A part lying over a limb, and its two halves, which hang from the limb's halves. */
+	record Overlay(ModelPart whole, ModelPart upper, ModelPart lower, boolean hiddenBefore) {
 	}
 
 	private static final Map<ModelPart, List<Split>> BY_ROOT = new WeakHashMap<>();
@@ -67,9 +82,10 @@ final class LimbSplitter {
 	 *
 	 * @param root the model the limb belongs to, so the halves can be hidden again when that model is drawn for a
 	 *             living mob
+	 * @param knee true for a leg, which bends at its front edge; false for an arm, which bends at its back edge
 	 * @return null when the limb cannot be cut there
 	 */
-	static Split split(ModelPart root, ModelPart limb, float plane) {
+	static Split split(ModelPart root, ModelPart limb, float plane, boolean knee) {
 		List<Split> known = BY_ROOT.computeIfAbsent(root, r -> new ArrayList<>());
 		for (Split split : known) {
 			if (split.limb == limb) {
@@ -85,8 +101,8 @@ final class LimbSplitter {
 			maxX = Math.max(maxX, cube.maxX);
 			maxZ = Math.max(maxZ, cube.maxZ);
 		}
-		// The lower half turns about the middle of the cut.
-		float pivotX = (minX + maxX) * 0.5F, pivotZ = (minZ + maxZ) * 0.5F;
+		// A model faces toward minus Z, so that side of the limb is its front.
+		float pivotX = (minX + maxX) * 0.5F, pivotZ = knee ? minZ : maxZ;
 		List<ModelPart.Cube> upper = new ArrayList<>();
 		List<ModelPart.Cube> lower = new ArrayList<>();
 		for (ModelPart.Cube cube : cubes) {
@@ -97,8 +113,29 @@ final class LimbSplitter {
 		if (upper.isEmpty() || lower.isEmpty()) {
 			return null;
 		}
-		ModelPart upperPart = new ModelPart(upper, new HashMap<>());
-		ModelPart lowerPart = new ModelPart(lower, new HashMap<>());
+		// A second skin sitting exactly on the limb bends with it; left whole it would stick out of the bent limb.
+		Map<String, ModelPart> upperChildren = new HashMap<>(), lowerChildren = new HashMap<>();
+		List<Overlay> overlays = new ArrayList<>();
+		for (Map.Entry<String, ModelPart> child : access.ragdolldeaths$children().entrySet()) {
+			ModelPart whole = child.getValue();
+			List<ModelPart.Cube> wholeCubes = ((ModelPartAccessor) (Object) whole).ragdolldeaths$cubes();
+			if (child.getKey().startsWith("ragdolldeaths_") || wholeCubes.isEmpty() || !sitsOnParent(whole)) {
+				continue;
+			}
+			List<ModelPart.Cube> up = new ArrayList<>(), low = new ArrayList<>();
+			boolean cut = true;
+			for (ModelPart.Cube cube : wholeCubes) {
+				cut &= halve(cube, plane, pivotX, pivotZ, up, low);
+			}
+			if (cut && !up.isEmpty() && !low.isEmpty()) {
+				ModelPart overlayUp = new ModelPart(up, new HashMap<>()), overlayLow = new ModelPart(low, new HashMap<>());
+				upperChildren.put("ragdolldeaths_" + child.getKey(), overlayUp);
+				lowerChildren.put("ragdolldeaths_" + child.getKey(), overlayLow);
+				overlays.add(new Overlay(whole, overlayUp, overlayLow, whole.skipDraw));
+			}
+		}
+		ModelPart upperPart = new ModelPart(upper, upperChildren);
+		ModelPart lowerPart = new ModelPart(lower, lowerChildren);
 		lowerPart.setInitialPose(PartPose.offset(pivotX, plane, pivotZ));
 		lowerPart.resetPose();
 		upperPart.visible = false;
@@ -107,7 +144,7 @@ final class LimbSplitter {
 		children.put(UPPER, upperPart);
 		children.put(LOWER, lowerPart);
 		access.ragdolldeaths$setChildren(children);
-		Split split = new Split(limb, upperPart, lowerPart, limb.skipDraw);
+		Split split = new Split(limb, upperPart, lowerPart, maxZ - minZ, limb.skipDraw, overlays);
 		known.add(split);
 		return split;
 	}
@@ -117,6 +154,18 @@ final class LimbSplitter {
 		split.limb.skipDraw = true;
 		split.upper.visible = true;
 		split.lower.visible = true;
+		for (Overlay overlay : split.overlays) {
+			// Whether it shows at all is the game's to say (a player can turn each sleeve off).
+			overlay.upper.visible = overlay.whole.visible;
+			overlay.lower.visible = overlay.whole.visible;
+			overlay.whole.skipDraw = true;
+		}
+	}
+
+	/** Whether a part is where its parent is, unturned: then its cubes are in the limb's own space. */
+	private static boolean sitsOnParent(ModelPart part) {
+		Rest rest = Rest.of(part);
+		return Math.abs(rest.x()) + Math.abs(rest.y()) + Math.abs(rest.z()) < EDGE && Math.abs(rest.xRot()) + Math.abs(rest.yRot()) + Math.abs(rest.zRot()) < EDGE;
 	}
 
 	/** Puts a model back to whole limbs; called whenever it is drawn for anything that is not a ragdoll. */
@@ -132,6 +181,9 @@ final class LimbSplitter {
 			split.limb.skipDraw = split.hiddenBefore;
 			split.upper.visible = false;
 			split.lower.visible = false;
+			for (Overlay overlay : split.overlays) {
+				overlay.whole.skipDraw = overlay.hiddenBefore;
+			}
 		}
 	}
 
@@ -160,14 +212,14 @@ final class LimbSplitter {
 			}
 		}
 		if (!up.isEmpty()) {
-			ModelPart.Cube made = cube(cube.minX, cube.minY, cube.minZ, cube.maxX, Math.min(cube.maxY, plane), cube.maxZ, up, 0.0F, 0.0F, 0.0F);
+			ModelPart.Cube made = cube(cube.minX, cube.minY, cube.minZ, cube.maxX, Math.min(cube.maxY, plane), cube.maxZ, up, 0.0F, 0.0F, 0.0F, 1.0F);
 			if (made == null) {
 				return false;
 			}
 			upper.add(made);
 		}
 		if (!low.isEmpty()) {
-			ModelPart.Cube made = cube(cube.minX, Math.max(cube.minY, plane), cube.minZ, cube.maxX, cube.maxY, cube.maxZ, low, pivotX, plane, pivotZ);
+			ModelPart.Cube made = cube(cube.minX, Math.max(cube.minY, plane), cube.minZ, cube.maxX, cube.maxY, cube.maxZ, low, pivotX, plane, pivotZ, LOWER_WIDTH);
 			if (made == null) {
 				return false;
 			}
@@ -181,7 +233,7 @@ final class LimbSplitter {
 	 * one is built with the right number of faces and its faces are then replaced.
 	 */
 	private static ModelPart.Cube cube(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, List<ModelPart.Polygon> faces,
-			float offsetX, float offsetY, float offsetZ) {
+			float offsetX, float offsetY, float offsetZ, float widthX) {
 		Direction[] directions = Direction.values();
 		if (faces.size() > directions.length) {
 			return null;
@@ -200,7 +252,7 @@ final class LimbSplitter {
 			ModelPart.Vertex[] moved = new ModelPart.Vertex[Compat.vertices(face).length];
 			for (int k = 0; k < moved.length; k++) {
 				ModelPart.Vertex v = Compat.vertices(face)[k];
-				moved[k] = Compat.vertex(Compat.vx(v) - offsetX, Compat.vy(v) - offsetY, Compat.vz(v) - offsetZ, Compat.vu(v), Compat.vv(v));
+				moved[k] = Compat.vertex((Compat.vx(v) - offsetX) * widthX, Compat.vy(v) - offsetY, Compat.vz(v) - offsetZ, Compat.vu(v), Compat.vv(v));
 			}
 			Compat.polygons(cube)[i] = Compat.newPolygon(moved, Compat.normal(face));
 		}

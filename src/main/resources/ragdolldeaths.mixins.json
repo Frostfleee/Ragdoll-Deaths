@@ -12,12 +12,17 @@
 		"EntityRendererMixin",
 		"EntityRenderStateMixin",
 		"HeldItemBurnMixin",
+		"HorseMarkingBurnMixin",
 		"LivingEntityMixin",
 		"LivingEntityRendererAccessor",
 		"LivingEntityRendererMixin",
 		"MinecraftMixin",
 		"ModelFeatureRendererMixin",
-		"ModelPartAccessor"
+		"ModelPartAccessor",
+		"SkinLayerBurnMixin",
+		"SlimeOuterBurnMixin",
+		"StuckInLimbMixin",
+		"WolfCollarBurnMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

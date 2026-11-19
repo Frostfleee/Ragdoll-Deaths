@@ -25,6 +25,31 @@ public class EntityRenderState implements RagdollRenderData.Holder {
 	private JointPose joints;
 	private Object physics;
 	private int light = -1;
+	private int arrows;
+	private int arrowSeed;
+	private boolean arrowsOnDead;
+
+	@Override
+	public int ragdolldeaths$arrows() {
+		return arrows;
+	}
+
+	@Override
+	public int ragdolldeaths$arrowSeed() {
+		return arrowSeed;
+	}
+
+	@Override
+	public boolean ragdolldeaths$arrowsOnDead() {
+		return arrowsOnDead;
+	}
+
+	@Override
+	public void ragdolldeaths$setArrows(int count, int seed, boolean dead) {
+		arrows = count;
+		arrowSeed = seed;
+		arrowsOnDead = dead;
+	}
 
 	@Override
 	public RagdollPose ragdolldeaths$pose() {

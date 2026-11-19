@@ -3,11 +3,13 @@ package com.frostfleee.ragdolldeaths.client;
 import com.frostfleee.ragdolldeaths.mixin.ModelPartAccessor;
 import com.frostfleee.ragdolldeaths.physics.Body;
 import com.frostfleee.ragdolldeaths.physics.Island;
+import com.frostfleee.ragdolldeaths.physics.Joint;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import com.frostfleee.ragdolldeaths.core.JointRole;
+import com.frostfleee.ragdolldeaths.core.LimbBend;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.core.BlockPos;
@@ -45,8 +47,14 @@ final class PhysicsRagdoll {
 	record Link(String[] path, int body, Matrix4f offset, Rest rest, float splitY, boolean hidden) {
 	}
 
-	/** A link found in one particular model. */
-	private record Binding(ModelPart part, Link link, Matrix4f correction, int parent, ModelPart[] between, LimbSplitter.Split split) {
+	/**
+	 * A link found in one particular model.
+	 *
+	 * @param hinge for the lower half of a limb, the knee or elbow it hangs from, else null
+	 * @param limb for the same, the limb's two halves
+	 */
+	private record Binding(ModelPart part, Link link, Matrix4f correction, int parent, ModelPart[] between, LimbSplitter.Split split,
+			Joint hinge, LimbSplitter.Split limb, Rest rest) {
 	}
 
 	final LivingEntity entity;
@@ -172,13 +180,14 @@ final class PhysicsRagdoll {
 	}
 
 	/**
-	 * The texture to draw a layer (armor, horse armor, a carpet) with: its own burnt copy once lava has reached it, else
-	 * the texture it has. An item that does not burn in lava (netherite) keeps its own. Notes, as it is drawn, which
-	 * parts of the layer's model the texture covers, so only those burn.
+	 * The texture to draw a layer with (armor, horse armor, a carpet, or a second skin such as a horse's markings or a
+	 * villager's clothes): its own burnt copy once lava has reached it, else the texture it has. An item that does not
+	 * burn in lava (netherite) keeps its own. Notes, as it is drawn, which parts of the layer's model the texture covers,
+	 * so only those burn. A second skin is often drawn on the mob's own model, with a texture of its own.
 	 */
 	@SuppressWarnings("unchecked")
 	<T> T layerTexture(T base, Model model, net.minecraft.world.item.ItemStack stack) {
-		if (base == null || model == null || model == mainModel || !built() || fireproof(stack)) {
+		if (base == null || model == null || !built() || fireproof(stack) || model == mainModel && base.equals(baseTexture)) {
 			return base;
 		}
 		Layer layer = null;
@@ -219,6 +228,16 @@ final class PhysicsRagdoll {
 			lines.add(name.substring(name.lastIndexOf('/') + 1) + (layer.scorch != null ? " burnt" : " kept"));
 		}
 		return lines;
+	}
+
+	/** For the self-test: whether a layer whose texture has this in its name has pixels burnt by lava. */
+	boolean layerBurnt(String name) {
+		for (Layer layer : layers) {
+			if (layer.base.toString().contains(name) && layer.scorch != null && layer.scorch.anyBurnt()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Whether the item shrugs off lava, as netherite does when it is dropped in it. */
@@ -278,6 +297,16 @@ final class PhysicsRagdoll {
 	private final Matrix4f inverse = new Matrix4f();
 	private final Matrix4f target = new Matrix4f();
 	private final Matrix4f local = new Matrix4f();
+	private final Matrix4f above = new Matrix4f();
+	private final PoseWatch watch = new PoseWatch();
+	// What is drawn eases after the physics (see LimbBend.follow): each part's turn relative to the torso, each knee's bend.
+	private double[] easedTurn, easedBend, easedAt;
+	private final Quaternionf torsoTurn = new Quaternionf(), bodyTurn = new Quaternionf(), relative = new Quaternionf(), eased = new Quaternionf(),
+			drawnTurn = new Quaternionf();
+	private final Vector3f pivot = new Vector3f(), torsoAt = new Vector3f();
+	private final Quaternionf torsoFix = new Quaternionf();
+	/** How many physics ticks this body has had. */
+	private long ticksRun;
 	private final Quaternionf rotation = new Quaternionf();
 	private final Vector3f angles = new Vector3f();
 	private final double[] at = new double[7];
@@ -316,6 +345,10 @@ final class PhysicsRagdoll {
 		java.util.Arrays.fill(across, 1.0);
 		java.util.Arrays.fill(upAxis, -1);
 		frames = new double[STEPS_PER_TICK + 1][bodies.length * 7];
+		easedTurn = new double[bodies.length * 4];
+		easedBend = new double[bodies.length];
+		easedAt = new double[bodies.length];
+		java.util.Arrays.fill(easedAt, -1.0);
 		for (int i = 0; i <= STEPS_PER_TICK; i++) {
 			capture(i);
 		}
@@ -347,6 +380,7 @@ final class PhysicsRagdoll {
 
 	/** The tick is over: its last pose becomes the next tick's first. */
 	void startTick() {
+		ticksRun++;
 		double[] last = frames[STEPS_PER_TICK];
 		for (int i = 0; i < STEPS_PER_TICK; i++) {
 			System.arraycopy(last, 0, frames[i], 0, last.length);
@@ -355,6 +389,7 @@ final class PhysicsRagdoll {
 
 	/** For the self-test only: moves the whole body, as if it had been carried there, with the poses it is drawn from. */
 	void moveForTest(double dx, double dy, double dz) {
+		watch.reset();
 		for (Body b : bodies) {
 			b.x += dx;
 			b.y += dy;
@@ -469,6 +504,11 @@ final class PhysicsRagdoll {
 		}
 		rootMatrix.set(pose);
 		ModelMath.mul(rootMatrix, root);
+		double now = ticksRun + alpha;
+		interpolate(torso);
+		torsoTurn.set((float) at[3], (float) at[4], (float) at[5], (float) at[6]);
+		torsoAt.set((float) (at[0] - camX), (float) (at[1] - lowered[torso] - camY), (float) (at[2] - camZ));
+		steadyTorso(now);
 		for (int i = 0; i < bound.length; i++) {
 			Binding b = bound[i];
 			int body = b.link.body();
@@ -483,14 +523,29 @@ final class PhysicsRagdoll {
 			if (b.correction != null) {
 				target.mul(b.correction);
 			}
+			if (!brokenFree(body)) {
+				if (body != torso && b.hinge == null) {
+					steady(body, now);
+				}
+				// The whole body turns together about its middle, so every part stays joined.
+				target.translateLocal(-torsoAt.x, -torsoAt.y, -torsoAt.z).rotateLocal(torsoFix).translateLocal(torsoAt);
+			}
 			// What the part hangs from: the model root, or another driven part, then any plain parts in between.
 			inverse.set(b.parent < 0 ? rootMatrix : drawn[b.parent]);
 			for (ModelPart step : b.between) {
 				ModelMath.mul(inverse, step);
 			}
+			above.set(inverse);
 			inverse.invertAffine().mul(target, local);
+			if (b.hinge != null && !b.hinge.broken) {
+				bendLimb(b);
+				target.set(above).mul(local);
+			}
 			drawn[i].set(target);
 			ModelMath.store(local, b.part, rotation, angles);
+			if (PoseWatch.ON && !brokenFree(b.link.body())) {
+				watch.check(this, b, b.part, b.link.path(), above, target, ticksRun + alpha, camX, camY, camZ);
+			}
 			if (hideHead && roles[body] == JointRole.HEAD && !b.part.skipDraw) {
 				b.part.skipDraw = true;
 				HIDDEN.computeIfAbsent(root, r -> new ArrayList<>()).add(b.part);
@@ -504,10 +559,133 @@ final class PhysicsRagdoll {
 		}
 	}
 
+	/** Eases the torso after its physics, which can jolt on landing; {@link #torsoFix} is the difference to draw. */
+	private void steadyTorso(double now) {
+		torsoFix.identity();
+		if (brokenFree(torso)) {
+			return;
+		}
+		int k = torso * 4;
+		if (easedAt[torso] < 0.0) {
+			store(k, torsoTurn);
+			easedAt[torso] = now;
+			return;
+		}
+		eased.set((float) easedTurn[k], (float) easedTurn[k + 1], (float) easedTurn[k + 2], (float) easedTurn[k + 3]);
+		double ticks = now - easedAt[torso];
+		if (ticks > 0.0) {
+			double dot = Math.min(1.0, Math.abs(eased.dot(torsoTurn)));
+			eased.slerp(torsoTurn, (float) LimbBend.follow(2.0 * Math.acos(dot), ticks)).normalize();
+			store(k, eased);
+			easedAt[torso] = now;
+		}
+		eased.mul(torsoTurn.conjugate(relative), torsoFix);
+	}
+
+	/** Turns the part being placed from where its physics body is to where it is drawn, about the part's own pivot. */
+	private void steady(int body, double now) {
+		bodyTurn.set((float) at[3], (float) at[4], (float) at[5], (float) at[6]);
+		torsoTurn.conjugate(relative).mul(bodyTurn);
+		int k = body * 4;
+		if (easedAt[body] < 0.0) {
+			store(k, relative);
+			easedAt[body] = now;
+			return;
+		}
+		eased.set((float) easedTurn[k], (float) easedTurn[k + 1], (float) easedTurn[k + 2], (float) easedTurn[k + 3]);
+		double ticks = now - easedAt[body];
+		if (ticks > 0.0) {
+			double dot = Math.min(1.0, Math.abs(eased.dot(relative)));
+			eased.slerp(relative, (float) LimbBend.follow(2.0 * Math.acos(dot), ticks)).normalize();
+			store(k, eased);
+			easedAt[body] = now;
+		}
+		// From the physics pose to the drawn one, with the pivot left on its joint.
+		torsoTurn.mul(eased, drawnTurn).mul(bodyTurn.conjugate());
+		target.getTranslation(pivot);
+		target.translateLocal(-pivot.x, -pivot.y, -pivot.z).rotateLocal(drawnTurn).translateLocal(pivot);
+	}
+
+	private void store(int k, Quaternionf q) {
+		easedTurn[k] = q.x;
+		easedTurn[k + 1] = q.y;
+		easedTurn[k + 2] = q.z;
+		easedTurn[k + 3] = q.w;
+	}
+
+	/**
+	 * Draws the lower half of a limb exactly on its hinge. The physics only comes close (its joints give a little under
+	 * load), and on screen even a small slip would open the limb or bend it the wrong way.
+	 */
+	private void bendLimb(Binding b) {
+		double angle = Math.atan2(local.m12(), local.m11());
+		boolean knee = roles[b.link.body()] == JointRole.LEG;
+		if (!Double.isNaN(LimbBend.testDegrees)) {
+			angle = Math.toRadians(knee ? LimbBend.testDegrees : -LimbBend.testDegrees);
+		}
+		angle = knee ? LimbBend.clampKnee(angle) : LimbBend.clampElbow(angle);
+		if (Double.isNaN(LimbBend.testDegrees)) {
+			int body = b.link.body();
+			double now = ticksRun + alpha;
+			if (easedAt[body] < 0.0) {
+				easedBend[body] = angle;
+				easedAt[body] = now;
+			} else if (now > easedAt[body]) {
+				easedBend[body] += (angle - easedBend[body]) * LimbBend.follow(Math.abs(angle - easedBend[body]), now - easedAt[body]);
+				easedAt[body] = now;
+			}
+			angle = easedBend[body];
+		}
+		lastBend = angle;
+		float slide = (float) LimbBend.slide(b.limb.thickness(), angle);
+		local.translation(b.rest.x() / 16.0F, b.rest.y() / 16.0F, b.rest.z() / 16.0F)
+				.rotateX((float) angle)
+				.translate(0.0F, slide / 16.0F, 0.0F);
+	}
+
+	/** For the pose watch: whether this part has come off its joint (a skeleton's bones fly apart, spinning, on purpose). */
+	private boolean brokenFree(int body) {
+		for (Joint joint : island.joints) {
+			if (joint.broken && (joint.b == bodies[body] || joint.a == bodies[body])) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** For the self-test: whether a player's left sleeve is cut in two with the arm under it. */
+	boolean sleeveBends() {
+		ModelPart root = Compat.root(mainModel);
+		ModelPart beside = Scorch.find(root, new String[] {"left_sleeve"});
+		if (beside != null) {
+			return Scorch.find(beside, new String[] {LimbSplitter.LOWER}) != null;
+		}
+		return Scorch.find(root, new String[] {"left_arm", LimbSplitter.LOWER, "ragdolldeaths_left_sleeve"}) != null;
+	}
+
+	/** For the self-test: the bend of the knee or elbow drawn last, in radians. */
+	double lastBend;
+
+	/** For the self-test: how many knees and elbows the body has, and whether the physics keeps each near its limits. */
+	int hinges(double[] worstDegreesOutside) {
+		int count = 0;
+		for (Joint joint : island.joints) {
+			if (joint.type != Joint.Type.HINGE || joint.broken) {
+				continue;
+			}
+			count++;
+			double angle = joint.hingeAngle();
+			double outside = Math.max(joint.lo - angle, angle - joint.hi);
+			worstDegreesOutside[0] = Math.max(worstDegreesOutside[0], Math.toDegrees(outside));
+		}
+		return count;
+	}
+
 	/** Finds this ragdoll's driven parts in a model: the mob's own, or a layer's with the same part names. */
 	private Binding[] bind(ModelPart root) {
 		List<Binding> found = new ArrayList<>();
 		List<String[]> paths = new ArrayList<>();
+		Map<ModelPart, LimbSplitter.Split> splits = new IdentityHashMap<>();
 		for (Link link : links) {
 			ModelPart part = root;
 			for (String name : link.path()) {
@@ -517,7 +695,22 @@ final class PhysicsRagdoll {
 				continue;
 			}
 			// A limb with a knee or an elbow gets its two halves in this model too (armor has legs of its own).
-			LimbSplitter.Split split = Float.isNaN(link.splitY()) ? null : LimbSplitter.split(root, part, link.splitY());
+			LimbSplitter.Split split = Float.isNaN(link.splitY()) ? null : LimbSplitter.split(root, part, link.splitY(), roles[link.body()] == JointRole.LEG);
+			if (split != null) {
+				splits.put(part, split);
+			}
+			// The lower half of a limb, and the hinge it turns on.
+			Joint hinge = null;
+			LimbSplitter.Split limb = null;
+			if (link.path()[link.path().length - 1].equals(LimbSplitter.LOWER)) {
+				ModelPart whole = Scorch.find(root, java.util.Arrays.copyOf(link.path(), link.path().length - 1));
+				limb = splits.get(whole);
+				for (Joint joint : island.joints) {
+					if (limb != null && joint.type == Joint.Type.HINGE && joint.b == bodies[link.body()]) {
+						hinge = joint;
+					}
+				}
+			}
 			// The nearest driven part above this one, and the undriven parts between the two.
 			int parent = -1;
 			int parentDepth = 0;
@@ -541,7 +734,7 @@ final class PhysicsRagdoll {
 				correction = ModelMath.mul(new Matrix4f(), link.rest()).invertAffine();
 				ModelMath.mul(correction, Rest.of(part));
 			}
-			found.add(new Binding(part, link, correction, parent, between.toArray(ModelPart[]::new), split));
+			found.add(new Binding(part, link, correction, parent, between.toArray(ModelPart[]::new), split, hinge, limb, Rest.of(part)));
 			paths.add(link.path());
 		}
 		return found.toArray(Binding[]::new);

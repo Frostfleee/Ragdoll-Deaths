@@ -47,7 +47,7 @@ final class EntityFilter {
 		return camera.distanceToSqr(position) <= config.maxRenderDistance * config.maxRenderDistance;
 	}
 
-	private static boolean keepsVanillaDeath(LivingEntity entity) {
+	static boolean keepsVanillaDeath(LivingEntity entity) {
 		return entity instanceof EnderDragon
 				|| entity instanceof WitherBoss
 				|| entity instanceof ArmorStand

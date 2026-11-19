@@ -23,6 +23,9 @@ class RagdollConfigTest {
 		assertEquals(1.0, config.hitReactionStrength);
 		assertEquals(60, config.ghostMaxTicks);
 		assertFalse(config.isExcluded("minecraft:zombie"));
+		assertTrue(config.stuckArrows);
+		assertFalse(config.stuckArrowsOnLiving);
+		assertFalse(config.kneesAndElbows);
 	}
 
 	@Test

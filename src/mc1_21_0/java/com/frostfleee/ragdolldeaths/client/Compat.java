@@ -212,4 +212,26 @@ public final class Compat {
 		net.minecraft.client.Screenshot.grab(minecraft.gameDirectory, minecraft.getMainRenderTarget(), message -> {
 		});
 	}
+
+	/** Draws the arrows stuck in a mob (see StuckArrows). This version draws an arrow as a small entity of its own. */
+	public static void stuckArrows(net.minecraft.client.model.Model model, LivingEntity entity, com.mojang.blaze3d.vertex.PoseStack pose,
+			net.minecraft.client.renderer.MultiBufferSource buffers, int light, float partialTicks) {
+		int count = StuckArrows.shownOn(entity);
+		if (count <= 0) {
+			return;
+		}
+		var dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+		// Drawing the arrow passes through the hook that keeps the state of the mob being drawn.
+		var state = RagdollStates.current;
+		StuckArrows.draw(model, count, entity.getId(), entity.isDeadOrDying(), pose, (p, yRot, xRot) -> {
+			var arrow = new net.minecraft.world.entity.projectile.Arrow(entity.level(), entity.getX(), entity.getY(), entity.getZ(),
+					net.minecraft.world.item.ItemStack.EMPTY, null);
+			arrow.setYRot(yRot);
+			arrow.setXRot(xRot);
+			arrow.yRotO = yRot;
+			arrow.xRotO = xRot;
+			dispatcher.render(arrow, 0.0, 0.0, 0.0, 0.0F, partialTicks, p, buffers, light);
+		});
+		RagdollStates.current = state;
+	}
 }

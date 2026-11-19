@@ -122,7 +122,7 @@ final class FluidForces {
 		ragdoll.lavaTicks = inLava ? ragdoll.lavaTicks + 1 : 0;
 		// Lava burns a body black, and it stays black wherever it ends up afterwards.
 		ragdoll.charred |= inLava;
-		if (inLava) {
+		if (inLava && PhysicsHost.INSTANCE.scorchTurn()) {
 			ragdoll.scorchTick();
 		}
 		return any;

@@ -23,7 +23,7 @@ A small, client-side visual mod. When a mob dies, its body becomes a real physic
 
 ## Installation
 
-Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.1.3 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.1.3 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
+Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.2.0 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.2.0 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
 
 The mod is **client-only**. Servers don't need it, and every loader skips it on a dedicated server, so no rendering code ever loads server-side. In multiplayer, each player who installs it sees the ragdolls on their own screen.
 
@@ -34,11 +34,13 @@ From 1.1.0 a dead mob is a set of rigid parts joined at its joints, simulated on
 - **Thrown by the blow.** Melee hits knock the body back from the part that was struck; Knockback, sprint hits and Punch throw it further. Arrows hit the part they pass through. Creeper and TNT blasts fling bodies away and are blocked by walls. A mace smash drives the body down.
 - **Real contact.** Bodies land on stairs, slabs and fences, slump against walls, pile on each other, slide on ice, bounce on slime, hang in cobwebs and sink into powder snow.
 - **Dying muscles.** A body braces and reaches for about a second and a half before going limp.
-- **Water and lava.** Bodies float and drift; soul sand bubble columns lift them fast and magma ones slowly. Lava burns black exactly the pixels that touched it, on the skin and on armor, horse armor and carpets too; a held item burns black with the hand that held it in the lava. Netherite and anything else that does not burn in lava keeps its look.
+- **Water and lava.** Bodies float and drift; soul sand bubble columns lift them fast and magma ones slowly. Lava burns black exactly the pixels that touched it, on the skin, on a mob's second skin (a horse's markings, a villager's clothes, a sheep's wool) and on armor, horse armor and carpets too; a held item burns black with the hand that held it in the lava. Netherite and anything else that does not burn in lava keeps its look.
 - **Special mobs.** Skeletons break apart, a snow golem's pumpkin rolls off, blaze and breeze rods drop free, spiders flip and curl.
 - **Riders.** A rider that dies on a living mount (a skeleton horseman, a spider or chicken jockey, a pillager on a ravager, a player on a horse) is a physics body too: it leaves the seat with its mount's momentum, pushed away from the blow, and tumbles to the ground.
 - **Mannequins** get a body like a player's.
 - **Pushing bodies.** Walk into a body and it slides along in front of you; living mobs push bodies too. It only goes one way: nothing about how players or mobs move changes.
+- **Stuck arrows.** Arrows that hit a mob stay in its dead body, as they do on players, and follow the part they are in. A second setting, off by default, shows them on living mobs too.
+- **Knees and elbows (off by default).** Limbs bend in two the way a person's do, up to 89 degrees, hinged at the front of the knee and the back of the elbow.
 - **Sounds.** Thuds, splashes and bone clatter, heard only by you.
 - **Blood (beta, off by default).** A spray from where the killing blow struck, a few drops while the body is fresh, and a splatter on a hard landing. Bones, golems, slimes, blazes, breezes, shulkers, allays, vexes and mannequins never bleed, and nothing bleeds in lava.
 
@@ -146,6 +148,8 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | `maxRenderDistance` | `64.0` | Deaths farther from the camera use the vanilla death. |
 | `maxActiveRagdolls` | `64` | Cap on bodies animating at once. |
 | `hideDeathTint` | `true` | Hide the red tint on dying bodies. |
+| `stuckArrows` | `true` | Arrows that hit a mob stay in its dead body. |
+| `stuckArrowsOnLiving` | `false` | Living mobs show their stuck arrows too (needs `stuckArrows`). |
 
 **Motion**
 
@@ -183,6 +187,7 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | Explosion Throw | 100% | How hard explosions throw bodies. |
 | Dying Muscles | 1.5 s | How long a body braces before going limp. |
 | Fall Reflexes | On | Arms out in a forward fall, chin tucked in a backward one. |
+| Knees and Elbows | Off | Cuts arms and legs in two so bodies bend at the knee and elbow, only the way a person's do and up to 89 degrees. |
 | Skeletons Break Apart | On | Off, skeletons fall in one piece. |
 | Impact Sounds | On | Thuds, splashes, bone clatter. |
 | Impact Dust | On | Block dust on hard landings, drops on splashes. |
@@ -191,14 +196,15 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | Death Camera Distance | 3.5 blocks | How far the death camera stays from your body. |
 | Death Camera Circling | On | Whether the death camera circles your body or holds its angle. |
 | Player Body Until Respawn | On | A player's body stays until they respawn, instead of going after the body lifetime. |
+| Stuck Arrows on Bodies | On | Arrows that hit a mob stay in its dead body, the way they show on players, until the body disappears. |
+| Stuck Arrows on Living Mobs | Off | Living mobs show the arrows stuck in them too. Needs Stuck Arrows on Bodies. |
 
 ### Beta settings
 
-Features still being worked on. Both are off by default.
+Features still being worked on, off by default.
 
 | Setting | Default | What it does |
 |---|---|---|
-| Knees and Elbows (Beta) | Off | Cuts arms and legs in two so they bend. |
 | Blood (Beta) | Off | A spray of blood from the killing blow, drips, and a splatter on hard landings. |
 
 ## Compatibility philosophy
@@ -213,6 +219,8 @@ Features still being worked on. Both are off by default.
   - skipping the vanilla death poof, only for bodies this mod is animating (the mod spawns its own where the body lay),
   - culling a body that's being animated by where it's drawn, not by its hitbox,
   - drawing a burning body's flames where the body is,
+  - drawing the arrows stuck in a mob, just before its model's matrices are put away,
+  - giving a burnt body's skin layers their burnt textures,
   - noting where each explosion went off, so TNT throws bodies away from the real blast,
   - moving the camera to your body while you are dead, only with Death Camera on.
 - **Entity Model Features.** With EMF installed (the mod behind Fresh Animations, AL's packs and other "3D mobs" packs), a body keeps its pack's look: EMF's animations pause on a mob while it is a ragdoll, and the limbs are shaped from the vanilla parts EMF keeps behind the pack's model. EMF is optional and never required.

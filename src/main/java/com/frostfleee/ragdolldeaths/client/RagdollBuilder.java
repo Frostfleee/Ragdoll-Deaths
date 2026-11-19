@@ -130,6 +130,9 @@ final class RagdollBuilder {
 			}
 		}
 		for (String[] path : riders) {
+			if (path.length == 1 && followsItsOwner(links, path[0])) {
+				continue;
+			}
 			ModelPart part = find(root, path);
 			Matrix4f matrix = ModelMath.mul(new Matrix4f(rootMatrix), part);
 			// A breeze's whirlwind dies with it.
@@ -301,7 +304,7 @@ final class RagdollBuilder {
 			if (role != null && simulated(role) && !foldedArms && shown && allowedIn(container, role)) {
 				boolean bends = ConfigStore.get().kneesAndElbows && container == null && (role == JointRole.ARM || role == JointRole.LEG) && vanillaRoot == null;
 				float plane = bends ? LimbSplitter.planeOf(part) : Float.NaN;
-				LimbSplitter.Split split = Float.isNaN(plane) ? null : LimbSplitter.split(root, part, plane);
+				LimbSplitter.Split split = Float.isNaN(plane) ? null : LimbSplitter.split(root, part, plane, role == JointRole.LEG);
 				piece = measure(childPath, part, vanilla != null ? vanilla : split == null ? part : split.upper(), role, matrix, Rest.of(part));
 				if (piece != null) {
 					piece.parent = container;
@@ -642,6 +645,35 @@ final class RagdollBuilder {
 		}
 	}
 
+	/**
+	 * On 1.21 and 1.21.1 the second skin of a humanoid (a hat, sleeves, a jacket, trouser legs) is not inside the part it
+	 * covers but beside it, and the game copies that part's pose onto it. On a body it follows the same simulated parts,
+	 * halves of a bent limb included.
+	 *
+	 * @return false when the name is no such part, or the part it covers is not on this body
+	 */
+	private static boolean followsItsOwner(List<PhysicsRagdoll.Link> links, String name) {
+		String owner = SECOND_SKIN.get(name);
+		if (owner == null) {
+			return false;
+		}
+		boolean found = false;
+		for (PhysicsRagdoll.Link link : List.copyOf(links)) {
+			String[] path = link.path();
+			boolean whole = path.length == 1, lowerHalf = path.length == 2 && path[1].equals(LimbSplitter.LOWER);
+			if (path[0].equals(owner) && (whole || lowerHalf)) {
+				String[] own = path.clone();
+				own[0] = name;
+				links.add(new PhysicsRagdoll.Link(own, link.body(), link.offset(), link.rest(), link.splitY(), false));
+				found = true;
+			}
+		}
+		return found;
+	}
+
+	private static final Map<String, String> SECOND_SKIN = Map.of("hat", "head", "jacket", "body", "left_sleeve", "left_arm", "right_sleeve", "right_arm",
+			"left_pants", "left_leg", "right_pants", "right_leg");
+
 	/** The knee or elbow between the two halves of a limb: it turns about the limb's own X axis, one way only. */
 	private static Joint hinge(Piece upper, Piece lower, PhysicsRagdoll ragdoll) {
 		Vector3f anchor = lower.matrix.transformPosition(new Vector3f());
@@ -650,9 +682,9 @@ final class RagdollBuilder {
 		// About the model's X axis a positive turn carries a hanging part backward: a knee folds the shin back, an
 		// elbow lifts the forearm forward.
 		if (lower.role == JointRole.LEG) {
-			joint.limits(0.0, rad(140));
+			joint.limits(0.0, com.frostfleee.ragdolldeaths.core.LimbBend.MAX_RADIANS);
 		} else {
-			joint.limits(rad(-140), 0.0);
+			joint.limits(-com.frostfleee.ragdolldeaths.core.LimbBend.MAX_RADIANS, 0.0);
 		}
 		return joint.damping(3.0);
 	}

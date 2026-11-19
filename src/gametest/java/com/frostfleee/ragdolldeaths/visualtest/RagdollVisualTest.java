@@ -43,6 +43,7 @@ public class RagdollVisualTest implements FabricClientGameTest {
 			server.runCommand(String.format("forceload add %d %d %d %d", x - 20, z - 230, x + 100, z - 180));
 			server.runCommand(String.format("forceload add %d %d %d %d", x - 20, z - 330, x + 220, z - 250));
 			server.runCommand(String.format("forceload add %d %d %d %d", x - 20, z - 370, x + 150, z - 331));
+			server.runCommand(String.format("forceload add %d %d %d %d", x + 300, z - 20, x + 380, z + 20));
 			context.waitTicks(60);
 			// Bodies vanish after five seconds by default; here they stay so each scene can be checked once it has come
 			// to rest. RAGDOLL_KNEES=1 turns on the knees-and-elbows beta, which is off by default.
@@ -212,6 +213,15 @@ public class RagdollVisualTest implements FabricClientGameTest {
 			}
 			if (runs.test("gear")) {
 				gear(context, world, server, x + 10, y, z - 80);
+			}
+			if (runs.test("knees")) {
+				knees(context, world, server, x + 310, y, z);
+			}
+			if (runs.test("arrows")) {
+				arrows(context, world, server, x + 335, y, z);
+			}
+			if (runs.test("markings")) {
+				markings(context, world, server, x + 360, y, z);
 			}
 		}
 	}
@@ -692,6 +702,94 @@ public class RagdollVisualTest implements FabricClientGameTest {
 		server.runCommand("execute as @e[tag=charred] at @s run damage @s 1000 minecraft:mob_attack by @e[tag=hitcharred,sort=nearest,limit=1]");
 		shots(context, "charred", 20, 2);
 		finish(context, "charred", 30);
+	}
+
+	/**
+	 * Knees and elbows from close by: one zombie on its back, one on its face and one in armor, each limb held at exact
+	 * bends and photographed from the side, from the feet and from above.
+	 */
+	private static void knees(ClientGameTestContext context, TestSingleplayerContext world, TestServerContext server, int x, int y, int z) {
+		context.runOnClient(client -> com.frostfleee.ragdolldeaths.client.ConfigStore.get().kneesAndElbows = true);
+		look(world, server, x + 6.0, y + 2.0, z + 9.0, x + 6.0, y + 0.3, z);
+		// {name, facing, where the blow comes from}: facing the attacker the mob falls on its back, turned away on its face.
+		String[][] mobs = {{"husk", "-90", "{NoAI:1b,Tags:[\"bent\"],Rotation:[-90f,0f]}"}, {"husk", "90", "{NoAI:1b,Tags:[\"bent\"],Rotation:[90f,0f]}"},
+				{"husk", "90", "{NoAI:1b,Tags:[\"bent\"],Rotation:[90f,0f],equipment:{chest:{id:\"minecraft:iron_chestplate\"},legs:{id:\"minecraft:iron_leggings\"}}}"}};
+		for (int i = 0; i < mobs.length; i++) {
+			server.runCommand(String.format("summon %s %d.5 %d %d.5 %s", mobs[i][0], x + i * 6, y, z, mobs[i][2]));
+			server.runCommand(String.format("summon armor_stand %d.5 %d %d.5 {Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"hitbent\"]}", x + i * 6 + 2, y + 1, z));
+		}
+		context.waitTicks(10);
+		server.runCommand("execute as @e[tag=bent] at @s run damage @s 1000 minecraft:mob_attack by @e[tag=hitbent,sort=nearest,limit=1]");
+		context.waitTicks(60);
+		java.util.regex.Pattern at = java.util.regex.Pattern.compile("minecraft:husk .* at \\((-?[0-9.]+) (-?[0-9.]+) (-?[0-9.]+)\\)");
+		java.util.List<double[]> bodies = new java.util.ArrayList<>();
+		for (String line : context.computeOnClient(client -> com.frostfleee.ragdolldeaths.client.RagdollTracker.INSTANCE.physicsReport())) {
+			java.util.regex.Matcher m = at.matcher(line);
+			if (m.find() && Math.abs(Double.parseDouble(m.group(1)) - x - 6.0) < 12.0 && Math.abs(Double.parseDouble(m.group(3)) - z) < 8.0) {
+				bodies.add(new double[] {Double.parseDouble(m.group(1)), Double.parseDouble(m.group(2)), Double.parseDouble(m.group(3))});
+			}
+		}
+		int[] bends = {45, 70, 89};
+		for (int n = 0; n < bodies.size(); n++) {
+			double[] b = bodies.get(n);
+			for (int bend : bends) {
+				context.runOnClient(client -> com.frostfleee.ragdolldeaths.core.LimbBend.testDegrees = bend);
+				look(world, server, b[0] + 0.3, b[1] - 1.2, b[2] + 1.7, b[0] + 0.3, b[1] - 1.52, b[2]);
+				context.waitTicks(2);
+				shots(context, "knees-" + n + "-" + bend + "-side", 1, 1);
+				look(world, server, b[0] + 1.7, b[1] - 0.7, b[2] + 1.0, b[0] + 0.4, b[1] - 1.52, b[2]);
+				context.waitTicks(2);
+				shots(context, "knees-" + n + "-" + bend + "-feet", 1, 1);
+				look(world, server, b[0] + 0.1, b[1] - 0.6, b[2] - 1.5, b[0] + 0.2, b[1] - 1.52, b[2]);
+				context.waitTicks(2);
+				shots(context, "knees-" + n + "-" + bend + "-back", 1, 1);
+			}
+		}
+		context.runOnClient(client -> com.frostfleee.ragdolldeaths.core.LimbBend.testDegrees = Double.NaN);
+		finish(context, "knees", 10);
+		context.runOnClient(client -> com.frostfleee.ragdolldeaths.client.ConfigStore.get().kneesAndElbows = System.getenv("RAGDOLL_KNEES") != null);
+	}
+
+	/** Five arrows in each of three mobs, with the same three alive beside them. */
+	private static void arrows(ClientGameTestContext context, TestSingleplayerContext world, TestServerContext server, int x, int y, int z) {
+		context.runOnClient(client -> com.frostfleee.ragdolldeaths.client.ConfigStore.get().stuckArrowsOnLiving = true);
+		look(world, server, x + 4.0, y + 2.2, z - 5.5, x + 4.0, y + 0.6, z + 1.0);
+		String[] mobs = {"zombie", "cow", "horse"};
+		for (int i = 0; i < mobs.length; i++) {
+			server.runCommand(String.format("summon %s %d.5 %d %d.5 {NoAI:1b,Tags:[\"shot\"],Rotation:[180f,0f]}", mobs[i], x + i * 3, y, z));
+			server.runCommand(String.format("summon %s %d.5 %d %d.5 {NoAI:1b,Tags:[\"shotalive\"],Rotation:[180f,0f]}", mobs[i], x + i * 3, y, z + 3));
+		}
+		context.waitTicks(10);
+		server.computeOnServer(s -> {
+			for (net.minecraft.world.entity.Entity entity : s.overworld().getAllEntities()) {
+				if (entity instanceof net.minecraft.world.entity.LivingEntity living && !(entity instanceof net.minecraft.world.entity.player.Player) && Math.abs(entity.getX() - x - 3.5) < 6.0 && Math.abs(entity.getZ() - z - 1.5) < 4.0) {
+					living.setArrowCount(5);
+				}
+			}
+			return null;
+		});
+		context.waitTicks(5);
+		server.runCommand("kill @e[tag=shot]");
+		shots(context, "arrows", 10, 4);
+		finish(context, "arrows", 10);
+		context.runOnClient(client -> com.frostfleee.ragdolldeaths.client.ConfigStore.get().stuckArrowsOnLiving = false);
+	}
+
+	/** Mobs with a second skin, knocked across a strip of lava onto the stone beyond: it must burn where lava touched it. */
+	private static void markings(ClientGameTestContext context, TestSingleplayerContext world, TestServerContext server, int x, int y, int z) {
+		look(world, server, x + 6.0, y + 1.6, z - 1.0, x + 6.0, y, z + 3.5);
+		server.runCommand(String.format("fill %d %d %d %d %d %d stone", x - 2, y - 2, z, x + 14, y - 1, z + 8));
+		server.runCommand(String.format("fill %d %d %d %d %d %d lava", x - 1, y - 1, z + 1, x + 13, y - 1, z + 1));
+		String[] mobs = {"horse|Variant:259", "villager", "sheep", "slime|Size:2", "drowned"};
+		for (int i = 0; i < mobs.length; i++) {
+			String[] mob = mobs[i].split("\\|");
+			server.runCommand(String.format("summon %s %d.5 %d %d.5 {NoAI:1b,Tags:[\"marked\"],Rotation:[180f,0f]%s}", mob[0], x + i * 3, y, z, mob.length > 1 ? "," + mob[1] : ""));
+			server.runCommand(String.format("summon armor_stand %d.5 %d %d.5 {Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"hitmarked\"]}", x + i * 3, y + 1, z - 3));
+		}
+		context.waitTicks(10);
+		server.runCommand("execute as @e[tag=marked] at @s run damage @s 1000 minecraft:mob_attack by @e[tag=hitmarked,sort=nearest,limit=1]");
+		shots(context, "markings", 12, 5);
+		finish(context, "markings", 10);
 	}
 
 	/** Row 10: a mace smash from above; the attacker is an armor stand dropped from height so it is falling fast. */

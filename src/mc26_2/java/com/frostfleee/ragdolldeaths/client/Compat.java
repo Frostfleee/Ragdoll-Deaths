@@ -171,4 +171,51 @@ public final class Compat {
 		net.minecraft.client.Screenshot.grab(minecraft.gameDirectory, minecraft.gameRenderer.mainRenderTarget(), message -> {
 		});
 	}
+
+	private static net.minecraft.client.model.object.projectile.ArrowModel arrowModel;
+	private static final net.minecraft.client.renderer.entity.state.ArrowRenderState ARROW_STATE = new net.minecraft.client.renderer.entity.state.ArrowRenderState();
+	private static java.lang.reflect.Method submitModel;
+
+	/**
+	 * The collector's method for drawing a model. 26.2 takes one more argument than 26.3 and this jar serves both, so
+	 * it is looked up by its shape.
+	 */
+	private static java.lang.reflect.Method submitModel() {
+		if (submitModel == null) {
+			for (java.lang.reflect.Method method : net.minecraft.client.renderer.OrderedSubmitNodeCollector.class.getMethods()) {
+				Class<?>[] p = method.getParameterTypes();
+				if (method.getName().equals("submitModel") && (p.length == 7 || p.length == 8) && p[3] == net.minecraft.client.renderer.rendertype.RenderType.class
+						&& p[4] == int.class && p[5] == int.class && p[6] == int.class) {
+					submitModel = method;
+				}
+			}
+		}
+		return submitModel;
+	}
+
+	/** Draws the arrows stuck in a mob (see StuckArrows). */
+	public static void stuckArrows(net.minecraft.client.model.Model model, net.minecraft.client.renderer.entity.state.LivingEntityRenderState state, com.mojang.blaze3d.vertex.PoseStack pose,
+			net.minecraft.client.renderer.SubmitNodeCollector collector) {
+		int count = RagdollRenderData.arrows(state);
+		if (count <= 0) {
+			return;
+		}
+		if (arrowModel == null) {
+			arrowModel = new net.minecraft.client.model.object.projectile.ArrowModel(Minecraft.getInstance().getEntityModels().bakeLayer(net.minecraft.client.model.geom.ModelLayers.ARROW));
+		}
+		java.lang.reflect.Method submit = submitModel();
+		StuckArrows.draw(model, count, RagdollRenderData.arrowSeed(state), RagdollRenderData.arrowsOnDead(state), pose, (p, yRot, xRot) -> {
+			StuckArrows.turn(p, yRot, xRot);
+			var type = arrowModel.renderType(net.minecraft.client.renderer.entity.TippableArrowRenderer.NORMAL_ARROW_LOCATION);
+			try {
+				if (submit.getParameterCount() == 7) {
+					submit.invoke(collector, arrowModel, ARROW_STATE, p, type, state.lightCoords, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, state.outlineColor);
+				} else {
+					submit.invoke(collector, arrowModel, ARROW_STATE, p, type, state.lightCoords, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+				}
+			} catch (ReflectiveOperationException e) {
+				throw new IllegalStateException(e);
+			}
+		});
+	}
 }

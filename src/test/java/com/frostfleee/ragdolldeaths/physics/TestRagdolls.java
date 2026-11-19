@@ -30,10 +30,10 @@ final class TestRagdolls {
 			int jt = 1 + side * 4;
 			joints[jt] = Joint.ball(torso, upperArm, x + s * 0.25, feetY + 1.5, z, 0, -1, 0, 1, 0, 0)
 					.swing(rad(-150), rad(150), rad(-150), rad(150)).twist(rad(-60), rad(60)).damping(3);
-			joints[jt + 1] = Joint.hinge(upperArm, foreArm, ax, feetY + 1.125, z, 1, 0, 0).limits(rad(-140), 0).damping(3);
+			joints[jt + 1] = Joint.hinge(upperArm, foreArm, ax, feetY + 1.125, z, 1, 0, 0).limits(rad(-89), 0).damping(3);
 			joints[jt + 2] = Joint.ball(torso, thigh, lx, feetY + 0.75, z, 0, -1, 0, 1, 0, 0)
 					.swing(rad(-120), rad(20), rad(-45), rad(45)).twist(rad(-30), rad(30)).damping(3);
-			joints[jt + 3] = Joint.hinge(thigh, shin, lx, feetY + 0.375, z, 1, 0, 0).limits(0, rad(140)).damping(3);
+			joints[jt + 3] = Joint.hinge(thigh, shin, lx, feetY + 0.375, z, 1, 0, 0).limits(0, rad(89)).damping(3);
 		}
 		return new Island(bodies, joints);
 	}

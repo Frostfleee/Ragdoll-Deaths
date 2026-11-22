@@ -17,6 +17,17 @@ public final class PhysicsPoseApplier {
 	 */
 	public static Object drawing;
 
+	/**
+	 * Called just before a block inside the mob being drawn (a sulfur cube's) is drawn: it moves with the body instead
+	 * of staying where the mob stood.
+	 */
+	public static void carryBlock(com.mojang.blaze3d.vertex.PoseStack poseStack) {
+		PhysicsRagdoll ragdoll = drawingPhysics();
+		if (ragdoll != null && !ragdoll.failed && ragdoll.built()) {
+			ragdoll.carryPose(poseStack);
+		}
+	}
+
 	private static PhysicsRagdoll drawingPhysics() {
 		return drawing instanceof EntityRenderState state ? RagdollRenderData.physics(state) : null;
 	}

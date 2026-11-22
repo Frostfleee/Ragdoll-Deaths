@@ -87,7 +87,8 @@ final class PoseWatch {
 				double turned = degrees(last.rotation, wanted), moved = last.position.distance(wantedAt);
 				if (turned > JUMP_DEGREES && turned / dt > JUMP_DEGREES_PER_TICK || moved > JUMP_BLOCKS && moved / dt > JUMP_BLOCKS_PER_TICK) {
 					jumps++;
-					log("jumped, in " + String.format(java.util.Locale.ROOT, "%.2f", dt) + " ticks", ragdoll, path, turned, moved, part, above, target);
+					log(String.format(java.util.Locale.ROOT, "jumped, in %.2f ticks at age %.2f (from %.2f %.2f %.2f to %.2f %.2f %.2f; %s)", dt, time, last.position.x, last.position.y,
+							last.position.z, wantedAt.x, wantedAt.y, wantedAt.z, ragdoll.watchReport(key)), ragdoll, path, turned, moved, part, above, target);
 				}
 			}
 		}

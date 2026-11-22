@@ -86,8 +86,8 @@ final class ActiveRagdoll {
 		if (config.physicsRagdolls) {
 			physics = new PhysicsRagdoll(entity);
 			if (entity.isPassenger() && !profile.blasted()) {
-				// A rider (EntityFilter lets through only one on a living mount) is still seated on the server, so its
-				// own last move is the mount's: it leaves the seat with the throw the classic death uses, per second.
+				// A rider (on a living mount, in a boat or in a minecart) is still seated on the server, so its own last
+				// move is the vehicle's: it leaves the seat with the throw the classic death uses, per second.
 				physics.seatThrow = new Vec3(profile.velocityX(), profile.velocityY(), profile.velocityZ()).scale(20.0);
 			}
 			physics.bleeds = Blood.bleeds(entity, profile) && !entity.isInLava();
@@ -111,17 +111,12 @@ final class ActiveRagdoll {
 		return startTick;
 	}
 
-	/**
-	 * Before each physics tick: the old death animation is worked out for this moment, not to be drawn but as what
-	 * the body's fading muscles are trying to do.
-	 */
-	void driveMuscles(long currentTick, RagdollConfig config) {
-		if (!isPhysical() || !physics.built() || physics.muscles == null) {
+	/** Before each physics tick: the fall reflexes and the twitches after landing. */
+	void driveReflexes(long currentTick, RagdollConfig config) {
+		if (!isPhysical() || !physics.built() || physics.reflexes == null) {
 			return;
 		}
-		double age = age(currentTick, 0.0F);
-		RagdollAnimator.compute(profile, config, age, stepPose, stepJoints);
-		physics.muscles.update(stepJoints, physics, age, config);
+		physics.reflexes.update(physics, age(currentTick, 0.0F), config);
 	}
 
 	/** Bodies that fall apart, melt or are made of loose rods animate their pieces their own way. */

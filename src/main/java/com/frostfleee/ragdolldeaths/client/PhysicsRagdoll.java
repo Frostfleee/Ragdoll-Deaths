@@ -275,8 +275,8 @@ final class PhysicsRagdoll {
 	boolean charredWhole() {
 		return charred && scorch == null && scorchFailed;
 	}
-	/** The dying muscles, while there are any. */
-	Muscles muscles;
+	/** The fall reflexes and the twitches after landing, while there are any. */
+	Reflexes reflexes;
 	/** What the killing blow was read as, for the debug log. */
 	String blow = "";
 	/** Where the torso was when the body was built, to tell how far it was thrown. */
@@ -294,6 +294,11 @@ final class PhysicsRagdoll {
 
 	// Scratch for the render thread.
 	private final Matrix4f rootMatrix = new Matrix4f();
+	/** The mob's own model's root as last drawn, and scratch for layer models that follow the torso whole. */
+	private final Matrix4f mainRoot = new Matrix4f(), torsoDelta = new Matrix4f(), carried = new Matrix4f(), blockPose = new Matrix4f();
+	private boolean mainRootSet;
+	/** How many times a layer model with no part of its own on this body (an elytra) was carried by its torso. */
+	long layersCarried;
 	private final Matrix4f inverse = new Matrix4f();
 	private final Matrix4f target = new Matrix4f();
 	private final Matrix4f local = new Matrix4f();
@@ -320,6 +325,51 @@ final class PhysicsRagdoll {
 	boolean bleeds;
 	int bleedingBody = -1;
 	int bleedTicks;
+	/** How many stains of the pool under the wound have spread so far. */
+	int pooled;
+	/** Whether the blood on the skin has been painted (it needs the texture, known once the body is drawn). */
+	private boolean bloodPainted;
+
+	/**
+	 * Paints blood on the body's skin, once: around the wound and here and there over the rest (see Scorch#bleed). It
+	 * shares the texture copy that lava burns, so a bloody body that goes into lava burns too.
+	 */
+	void paintBlood() {
+		if (bloodPainted || baseTexture == null || mainModel == null || !built()) {
+			return;
+		}
+		bloodPainted = true;
+		if (scorch == null && !scorchFailed) {
+			scorch = Scorch.of(baseTexture);
+			scorchFailed = scorch == null;
+		}
+		if (scorch != null) {
+			scorch.bleed(Wounds.seed(baseTexture, Wounds.pattern(entity)), Wounds.DEAD_BLOBS, partOf(bleedingBody), 3);
+		}
+	}
+
+	/** Whether blood has been painted on this body's skin. */
+	boolean bloodPainted() {
+		return bloodPainted && scorch != null;
+	}
+
+	/** A part that hit something hard gets a little more blood on it. */
+	void bloodOn(int body) {
+		if (bloodPainted && scorch != null && body >= 0) {
+			scorch.bleed(entity.getUUID().getMostSignificantBits() ^ bleedTicks, 0, partOf(body), 1);
+		}
+	}
+
+	/** The part of the mob's own model that a body moves, or null. */
+	private ModelPart partOf(int body) {
+		Link best = null;
+		for (Link link : links) {
+			if (link.body() == body && (best == null || link.path().length < best.path().length)) {
+				best = link;
+			}
+		}
+		return best == null || mainModel == null ? null : Scorch.find(Compat.root(mainModel), best.path());
+	}
 
 	PhysicsRagdoll(LivingEntity entity) {
 		this.entity = entity;
@@ -504,6 +554,10 @@ final class PhysicsRagdoll {
 		}
 		rootMatrix.set(pose);
 		ModelMath.mul(rootMatrix, root);
+		if (model == mainModel) {
+			mainRoot.set(rootMatrix);
+			mainRootSet = true;
+		}
 		double now = ticksRun + alpha;
 		interpolate(torso);
 		torsoTurn.set((float) at[3], (float) at[4], (float) at[5], (float) at[6]);
@@ -557,6 +611,77 @@ final class PhysicsRagdoll {
 				LimbSplitter.show(b.split);
 			}
 		}
+		if (bound.length == 0 && model != mainModel) {
+			carryWithTorso(root);
+		}
+	}
+
+	/**
+	 * A layer model none of whose parts are on the body (an elytra's two wings, which the game hangs from the mob's
+	 * root, not from its body) moves rigidly with the torso: each of its top parts keeps where it sits against the
+	 * torso in the pose the game gave it.
+	 */
+	private void carryWithTorso(ModelPart root) {
+		if (!torsoDelta(torsoDelta)) {
+			return;
+		}
+		inverse.set(rootMatrix).invertAffine();
+		for (ModelPart part : ((ModelPartAccessor) (Object) root).ragdolldeaths$children().values()) {
+			carried.set(rootMatrix);
+			ModelMath.mul(carried, part);
+			torsoDelta.mul(carried, carried);
+			inverse.mul(carried, local);
+			ModelMath.store(local, part, rotation, angles);
+		}
+		layersCarried++;
+	}
+
+	/**
+	 * Where the torso is drawn this frame against where the game's own pose puts it: the matrix (camera-relative, like
+	 * the pose stack) that carries anything the game draws fixed to the mob's pose along with the body. Valid once the
+	 * mob's own model has been drawn this frame; false before that.
+	 */
+	/**
+	 * Moves a pose the game set up for something fixed to the mob (the block inside a sulfur cube) onto where the body
+	 * is drawn. Counted for the self-test.
+	 */
+	void carryPose(com.mojang.blaze3d.vertex.PoseStack poseStack) {
+		Matrix4f pose = poseStack.last().pose();
+		if (!torsoDelta(torsoDelta)) {
+			return;
+		}
+		// pose⁻¹ · delta · pose, so that multiplying it on (as the stack does) puts delta in front of the pose.
+		blockPose.set(pose).invertAffine().mul(torsoDelta).mul(pose);
+		// The matrices themselves, which every game version has (the stack's own helper for this came later).
+		pose.mul(blockPose);
+		poseStack.last().normal().mul(new org.joml.Matrix3f(blockPose));
+		carriedBlocks++;
+	}
+
+	/** How many times a block inside a mob was carried with its body. */
+	static long carriedBlocks;
+
+	boolean torsoDelta(Matrix4f out) {
+		Link torsoLink = null;
+		for (Link link : links) {
+			if (link.body() == torso && (torsoLink == null || link.path().length < torsoLink.path().length)) {
+				torsoLink = link;
+			}
+		}
+		if (torsoLink == null || !mainRootSet || failed) {
+			return false;
+		}
+		interpolate(torso);
+		Matrix4f drawnTorso = carried.translation((float) (at[0] - camX), (float) (at[1] - lowered[torso] - camY), (float) (at[2] - camZ))
+				.rotate(rotation.set((float) at[3], (float) at[4], (float) at[5], (float) at[6]))
+				.mul(torsoLink.offset());
+		if (!brokenFree(torso)) {
+			drawnTorso.translateLocal(-torsoAt.x, -torsoAt.y, -torsoAt.z).rotateLocal(torsoFix).translateLocal(torsoAt);
+		}
+		// From where the torso would be in the game's pose to where it is drawn.
+		ModelMath.mul(out.set(mainRoot), torsoLink.rest()).invertAffine();
+		drawnTorso.mul(out, out);
+		return true;
 	}
 
 	/** Eases the torso after its physics, which can jolt on landing; {@link #torsoFix} is the difference to draw. */
@@ -789,6 +914,23 @@ final class PhysicsRagdoll {
 			}
 		}
 		return out.toString();
+	}
+
+	/** For the pose watch: what the physics says about the part a jump was seen on, to tell what caused it. */
+	String watchReport(Object key) {
+		if (!(key instanceof Binding binding)) {
+			return "";
+		}
+		int index = binding.link().body();
+		Body b = bodies[index];
+		double s = Math.clamp(alpha, 0.0F, 1.0F) * STEPS_PER_TICK;
+		int i = Math.min(STEPS_PER_TICK - 1, (int) s);
+		double[] from = frames[i], to = frames[i + 1];
+		int k = index * 7;
+		return String.format(java.util.Locale.ROOT,
+				"physics tick %d, alpha %.2f, body %d at %.2f %.2f %.2f moving %.1f %.1f %.1f, drawn between %.2f %.2f %.2f and %.2f %.2f %.2f, asleep %b, %d walkers, %s model",
+				ticksRun, alpha, index, b.x, b.y, b.z, b.vx, b.vy, b.vz, from[k], from[k + 1], from[k + 2], to[k], to[k + 1], to[k + 2], island.asleep,
+				walkers == null ? 0 : walkers.size(), binding.part() == null ? "?" : bindings.size() + " bound");
 	}
 
 	/** For the visual test: how many parts have their centre inside a block's collision shape. */

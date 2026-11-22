@@ -553,4 +553,55 @@ class PhysicsEngineTest {
 		// A loose ceiling so a slow CI machine does not fail the build; the printed numbers are what to read.
 		assertTrue(total / ticks < 8.0, "average " + total / ticks + " ms per tick");
 	}
+
+	/**
+	 * An enderman's arm is an eighth of a block thick. Its body sliding off the edge of a platform drags the arm over the
+	 * edge: the arm must slide over the corner, never sink into the edge block (it once did, the self-test caught it with
+	 * its middle 0.2 blocks deep in the stone). Many starting points, as it depends on how the arm meets the corner.
+	 */
+	@Test
+	void aThinLimbDraggedOverAnEdgeDoesNotSinkIntoIt() {
+		List<String> sunk = new ArrayList<>();
+		double s = Math.sqrt(0.5);
+		for (int angle = -60; angle <= 60; angle += 15) {
+			for (double push = 0.5; push <= 3.0; push += 0.5) {
+				for (double drop = -0.8; drop <= 0.81; drop += 0.4) {
+					// A platform of whole blocks, x below 0, its top at y 1; nothing past the edge.
+					Boxes stage = new Boxes();
+					for (int x = -4; x < 0; x++) {
+						for (int z = -3; z < 3; z++) {
+							stage.box(x, 0, z, x + 1, 1, z + 1, STONE, 0);
+						}
+					}
+					PhysicsWorld w = world(stage);
+					double a = Math.toRadians(angle);
+					// The arm lies flat on the platform, its shoulder end at the edge, pointing back at an angle.
+					double half = 0.9375;
+					double cx = -Math.cos(a) * half, cz = Math.sin(a) * half;
+					// Lying along its length: its long (Y) axis turned onto -X (90 degrees about Z), then round Y to the angle.
+					double qy = Math.sin(a / 2), qw = Math.cos(a / 2);
+					Body arm = new Body().box(0.0625, half, 0.0625, 3).position(cx, 1.0625, cz).rotation(qy * s, qy * s, qw * s, qw * s);
+					// The body just past the edge, the shoulder on its inner side (higher or lower on it), sliding off.
+					Body torso = new Body().box(0.25, 0.375, 0.125, 30).position(0.26, 1.0625 + drop * 0.375, 0).velocity(push, 0, 0);
+					Joint shoulder = Joint.ball(torso, arm, 0.0, 1.0625, 0.0, 0, -1, 0, 1, 0, 0)
+							.swing(Math.toRadians(-150), Math.toRadians(150), Math.toRadians(-150), Math.toRadians(150)).damping(3);
+					w.add(new Island(new Body[] {torso, arm}, new Joint[] {shoulder}));
+					double deepest = 0.0;
+					for (int i = 0; i < 180 && arm.y > -2; i++) {
+						w.step();
+						// The self-test's check: the middle inside a block, more than 0.03 from all of that block's faces.
+						if (arm.x > -4 && arm.x < 0 && arm.y > 0 && arm.y < 1 && arm.z > -3 && arm.z < 3) {
+							double depth = Math.min(Math.min(arm.x - Math.floor(arm.x), Math.ceil(arm.x) - arm.x),
+									Math.min(Math.min(arm.y, 1.0 - arm.y), Math.min(arm.z - Math.floor(arm.z), Math.ceil(arm.z) - arm.z)));
+							deepest = Math.max(deepest, depth);
+						}
+					}
+					if (deepest > 0.03) {
+						sunk.add(String.format(java.util.Locale.ROOT, "angle %d push %.1f shoulder %.1f: %.2f deep", angle, push, drop, deepest));
+					}
+				}
+			}
+		}
+		assertTrue(sunk.isEmpty(), sunk.size() + " sank into the edge: " + sunk);
+	}
 }

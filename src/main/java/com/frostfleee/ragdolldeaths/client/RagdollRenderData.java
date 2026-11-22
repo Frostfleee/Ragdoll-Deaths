@@ -36,11 +36,12 @@ public final class RagdollRenderData {
 	@SuppressWarnings("unchecked")
 	public static <T> T texture(EntityRenderState state, T base) {
 		PhysicsRagdoll ragdoll = physics(state);
+		int wounds = ((Holder) state).ragdolldeaths$wounds();
 		if (ragdoll == null) {
-			return base;
+			return Wounds.texture(base, wounds, !arrowsOnDead(state));
 		}
 		ragdoll.baseTexture = base;
-		return ragdoll.scorch != null ? (T) ragdoll.scorch.id : base;
+		return ragdoll.scorch != null ? (T) ragdoll.scorch.id : Wounds.texture(base, wounds, false);
 	}
 
 	static void setPhysics(EntityRenderState state, PhysicsRagdoll ragdoll) {
@@ -71,6 +72,15 @@ public final class RagdollRenderData {
 		boolean ragdolldeaths$arrowsOnDead();
 
 		void ragdolldeaths$setArrows(int count, int seed, boolean dead);
+
+		/** How much blood a hurt mob shows (see Wounds), 0 for none. */
+		int ragdolldeaths$wounds();
+
+		void ragdolldeaths$setWounds(int wounds);
+	}
+
+	static void setWounds(EntityRenderState state, int wounds) {
+		((Holder) state).ragdolldeaths$setWounds(wounds);
 	}
 
 	/** Forgets everything about the last body this state was filled for: some versions reuse one state per renderer. */
@@ -79,6 +89,7 @@ public final class RagdollRenderData {
 		setPhysics(state, null);
 		((Holder) state).ragdolldeaths$setLight(-1);
 		setArrows(state, 0, 0, false);
+		setWounds(state, 0);
 	}
 
 	public static int arrows(EntityRenderState state) {

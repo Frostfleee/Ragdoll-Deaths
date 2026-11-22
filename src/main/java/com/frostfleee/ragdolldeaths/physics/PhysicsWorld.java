@@ -420,9 +420,12 @@ public final class PhysicsWorld {
 				boolean buried = b.x > d[at] && b.x < d[at + 3] && b.y > d[at + 1] && b.y < d[at + 4] && b.z > d[at + 2] && b.z < d[at + 5]
 						&& !covered(boxes, b.x, d[at + 4] + 0.01, b.z);
 				boolean touching = buried ? col.collideUpward(b.margin) : col.collide(b.margin);
-				if (touching && !buried && col.ny < 0.99 && onTopEdge(d[at + 4])) {
+				if (touching && !buried && col.ny < 0.99 && onTopEdge(d[at + 4]) && !(thin(b) && outerEdge(boxes, d[at + 4]))) {
 					// Caught on the top edge of a block it is lying on: that is resting on the block, so it is pushed
-					// straight up. A tilted push there acts like a bump at every seam between blocks.
+					// straight up. A tilted push there acts like a bump at every seam between blocks. Not for a thin part
+					// at an outer edge (open air past it): there the side of the block is real, and an enderman's arm
+					// dragged over the edge with only an upward push sank into the block's side. Thicker parts keep the
+					// upward push, which lets a body come to rest on stairs.
 					touching = covered(boxes, b.x, d[at + 4] + 0.01, b.z) ? touching : col.collideUpward(b.margin);
 				} else if (touching && internalFace(boxes)) {
 					// The face it found is pressed against the next block, inside the ground: a body sliding across the
@@ -444,6 +447,32 @@ public final class PhysicsWorld {
 			}
 		}
 		return true;
+	}
+
+	/** A part thinner than this (half its smallest size, in blocks) is thin enough to slip into the side of a block. */
+	private static final double THIN = 0.1;
+
+	private static boolean thin(Body b) {
+		return Math.min(b.hx, Math.min(b.hy, b.hz)) < THIN;
+	}
+
+	/**
+	 * Whether the contacts just found are at an outer edge of the top of a fixed box: level with its top, just past
+	 * them the way the contact pushes (sideways only), there is open air, not the next block.
+	 */
+	private boolean outerEdge(BoxBuffer boxes, double top) {
+		double length = Math.sqrt(col.nx * col.nx + col.nz * col.nz);
+		if (length < 1.0e-6) {
+			return false;
+		}
+		double x = 0, z = 0;
+		for (int k = 0; k < col.count; k++) {
+			x += col.pb[k * 3];
+			z += col.pb[k * 3 + 2];
+		}
+		x /= col.count;
+		z /= col.count;
+		return !covered(boxes, x + col.nx / length * 0.05, top - 0.05, z + col.nz / length * 0.05);
 	}
 
 	/**

@@ -124,7 +124,7 @@ abstract class LivingEntityRendererMixin {
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/LivingEntityRenderer;getTextureLocation(Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/resources/ResourceLocation;"))
 	private net.minecraft.resources.ResourceLocation ragdolldeaths$scorched(net.minecraft.resources.ResourceLocation texture, @Local(argsOnly = true) LivingEntity entity) {
 		LivingEntityRenderState state = ragdolldeaths$state(entity);
-		return state == null ? texture : RagdollRenderData.texture(state, texture);
+		return state == null ? com.frostfleee.ragdolldeaths.client.Wounds.livingTexture(texture, entity) : RagdollRenderData.texture(state, texture);
 	}
 
 	@ModifyExpressionValue(

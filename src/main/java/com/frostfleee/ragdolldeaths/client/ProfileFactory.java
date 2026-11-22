@@ -109,8 +109,8 @@ final class ProfileFactory {
 					.velocity(launch.x, launch.y, launch.z)
 					.maxPush(clearance(level, entity, center, launch.x, launch.z, horizontalReach(launch), width))
 					.floorDrop(floorDistance(level, entity, position, FLOOR_SCAN, ClipContext.Fluid.ANY));
-		} else if (EntityFilter.isMountedRider(entity)) {
-			Vec3 thrown = riderThrow(entity, hit, bodyYaw);
+		} else if (EntityFilter.isMountedRider(entity) || EntityFilter.isVehicleRider(entity)) {
+			Vec3 thrown = EntityFilter.isVehicleRider(entity) ? clampLength(carried(entity), MAX_SPEED) : riderThrow(entity, hit, bodyYaw);
 			builder.freeFall(true)
 					.simulated(true)
 					.fallLimit(fallLimit)
@@ -325,9 +325,14 @@ final class ProfileFactory {
 	/** A rider leaves its seat with its mount's momentum, pushed away from the blow and hopping up a little. */
 	private static Vec3 riderThrow(LivingEntity entity, HitDirection hit, float bodyYaw) {
 		double[] away = hit.fallDirection(bodyYaw, entity.getUUID().getLeastSignificantBits() ^ entity.getId());
-		Entity vehicle = entity.getVehicle();
-		Vec3 carried = vehicle == null ? Vec3.ZERO : vehicle.position().subtract(vehicle.xo, vehicle.yo, vehicle.zo);
+		Vec3 carried = carried(entity);
 		return clampLength(new Vec3(carried.x + away[0] * RIDER_THROW, Math.max(0.0, carried.y) + RIDER_HOP, carried.z + away[1] * RIDER_THROW), MAX_SPEED);
+	}
+
+	/** How far the vehicle carried its rider in the last tick: what a body leaving the seat starts with. */
+	private static Vec3 carried(LivingEntity entity) {
+		Entity vehicle = entity.getVehicle();
+		return vehicle == null ? Vec3.ZERO : vehicle.position().subtract(vehicle.xo, vehicle.yo, vehicle.zo);
 	}
 
 	private static double horizontalReach(Vec3 velocity) {

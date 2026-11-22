@@ -12,9 +12,9 @@ import net.minecraft.world.entity.LivingEntity;
  * The mobs that do not simply fall over.
  *
  * <ul>
- * <li><b>Skeletons</b> are bones held together by nothing much: a hard enough blow, or a hard enough landing,
- * breaks them apart at the joints, and the skull, ribcage and limbs scatter as separate pieces. A light blow just
- * drops them like any other body.</li>
+ * <li><b>Skeletons</b> always come apart at the joints. A hard blow breaks them at once and the skull, ribcage and
+ * limbs scatter; after a gentle death the body falls whole and breaks where it lands. One that never lands (in the
+ * void, in deep water) lets its bones go after {@link #LOOSEN_TICKS}, with no throw: they drift apart on their own.</li>
  * <li><b>Slimes and magma cubes</b> are one lump that tumbles and comes to rest, keeping its shape.</li>
  * <li><b>The snow golem</b> loses its pumpkin head, which falls off and rolls; its snowballs keep their shape.</li>
  * <li><b>Blazes and breezes</b> are held together by their own power: when it goes, their rods drop free.</li>
@@ -30,6 +30,10 @@ final class SpecialBodies {
 	/** A bone whose speed changes by this much within one tick (blocks per second) has hit something hard enough to snap off. */
 	private static final double SNAP_SPEED = 9.0;
 	private static final double TICK = 1.0 / 20.0;
+	/** A skeleton that has not landed this long after death (1.5 seconds) lets its bones go where they are. */
+	static final int LOOSEN_TICKS = 30;
+	/** How hard the bones scatter when a skeleton that fell whole breaks on landing. */
+	private static final double LANDING_SCATTER = 0.6;
 
 	private final Kind kind;
 	private final Random random;
@@ -37,6 +41,17 @@ final class SpecialBodies {
 	private final double[] before;
 	private boolean first = true;
 	private boolean snapped;
+	/** Physics ticks since death. */
+	private int ticks;
+	/** How a skeleton came apart, for the self-test: "blow", "landing", "loosened", or null while still whole. */
+	String brokeBy;
+	/** For the self-test: the ticks since death it came apart at, or -1. */
+	int brokeAt = -1;
+
+	/** For the self-test: physics ticks since death. */
+	int ticks() {
+		return ticks;
+	}
 
 	/** Whether this is a skeleton that has come apart, whose pieces clatter. */
 	boolean isLooseBones() {
@@ -60,14 +75,13 @@ final class SpecialBodies {
 		Special special = ProfileFactory.specialOf(entity);
 		Body[] bodies = ragdoll.bodies;
 		if (special == Special.SKELETON) {
-			if (!config.skeletonsBreak) {
-				return null;
-			}
 			SpecialBodies made = new SpecialBodies(Kind.SKELETON, bodies.length, seed);
+			// The body is built the first time the dying mob is drawn, which can be a while after it died (it was out of
+			// sight, or the game was busy): the time to let go counts from the death.
+			made.ticks = Math.max(0, entity.deathTime);
 			if (blowStrength >= SHATTER_STRENGTH) {
-				for (Joint joint : ragdoll.island.joints) {
-					made.snap(ragdoll, joint, 2.5);
-				}
+				made.snapAll(ragdoll, 2.5);
+				made.brokeBy = "blow";
 				ragdoll.blow += "; shattered";
 			}
 			return made;
@@ -127,11 +141,76 @@ final class SpecialBodies {
 		part.wz += (random.nextDouble() - 0.5) * 4.0 * scatter;
 	}
 
+	private void snapAll(PhysicsRagdoll ragdoll, double scatter) {
+		for (Joint joint : ragdoll.island.joints) {
+			snap(ragdoll, joint, scatter);
+		}
+	}
+
+	/** Lets every joint go without pushing anything: the bones only part where they already are. */
+	private void loosenAll(PhysicsRagdoll ragdoll) {
+		for (Joint joint : ragdoll.island.joints) {
+			if (!joint.broken) {
+				ragdoll.island.release(joint);
+			}
+		}
+		snapped = true;
+	}
+
+	/** Whether every joint of the body has let go. */
+	private static boolean allBroken(PhysicsRagdoll ragdoll) {
+		for (Joint joint : ragdoll.island.joints) {
+			if (!joint.broken) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Whether some part of the body is resting on, or has just struck, something that is not part of it: it landed.
+	 * The legs do not count, as a skeleton killed standing has its feet on the ground from the start: it has landed
+	 * once it has fallen over onto something.
+	 */
+	private static boolean touchesOutside(PhysicsRagdoll ragdoll) {
+		Body[] bodies = ragdoll.bodies;
+		for (int i = 0; i < bodies.length; i++) {
+			Body b = bodies[i];
+			if (ragdoll.roles[i] == JointRole.LEG) {
+				continue;
+			}
+			for (int m = 0; m < b.heldCount(); m++) {
+				if (indexOf(bodies, b.heldWith(m)) < 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	/** Called after each tick of physics. */
 	void afterTick(PhysicsRagdoll ragdoll) {
 		Body[] bodies = ragdoll.bodies;
 		switch (kind) {
 			case SKELETON -> {
+				ticks++;
+				if (!allBroken(ragdoll)) {
+					if (ragdoll.island.asleep || touchesOutside(ragdoll)) {
+						// It fell whole and has come down on something: it breaks apart where it lies.
+						snapAll(ragdoll, LANDING_SCATTER);
+						if (brokeBy == null) {
+							brokeBy = "landing";
+							brokeAt = ticks;
+						}
+					} else if (ticks >= LOOSEN_TICKS) {
+						// Still falling or floating (the void, deep water): the bones only part, with no throw.
+						loosenAll(ragdoll);
+						if (brokeBy == null) {
+							brokeBy = "loosened";
+							brokeAt = ticks;
+						}
+					}
+				}
 				// A bone that was just stopped short (it hit the ground, a wall) breaks off at its joints.
 				if (!first && !ragdoll.island.asleep) {
 					for (int i = 0; i < bodies.length; i++) {
@@ -165,6 +244,6 @@ final class SpecialBodies {
 				return i;
 			}
 		}
-		return 0;
+		return -1;
 	}
 }

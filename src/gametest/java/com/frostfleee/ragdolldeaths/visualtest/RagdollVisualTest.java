@@ -51,9 +51,10 @@ public class RagdollVisualTest implements FabricClientGameTest {
 				com.frostfleee.ragdolldeaths.core.RagdollConfig config = com.frostfleee.ragdolldeaths.client.ConfigStore.get().copy();
 				config.bodyLifetimeTicks = 600;
 				config.kneesAndElbows = System.getenv("RAGDOLL_KNEES") != null;
-				// RAGDOLL_LIMP=1 switches the dying muscles off, to compare against a body that is limp from the start.
+				// RAGDOLL_LIMP=1 switches the fall reflexes and leg kicks off, for a body that is limp from the start.
 				if (System.getenv("RAGDOLL_LIMP") != null) {
-					config.muscleSeconds = 0.0;
+					config.reflexes = false;
+					config.legKicks = false;
 				}
 				com.frostfleee.ragdolldeaths.client.ConfigStore.save(config);
 			});
@@ -128,7 +129,7 @@ public class RagdollVisualTest implements FabricClientGameTest {
 			if (runs.test("water")) {
 				water(context, world, server, x, y, z + 200);
 			}
-			// The physics ragdoll scenes, one per row of the acceptance table in PHYSICS_PROMPT.md.
+			// The physics ragdoll scenes, one per row.
 			if (runs.test("row1")) {
 				chest(context, world, server, x, y, z - 100);
 			}

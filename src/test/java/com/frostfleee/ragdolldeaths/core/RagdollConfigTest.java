@@ -72,6 +72,19 @@ class RagdollConfigTest {
 	}
 
 	@Test
+	void settingsRemovedIn121StillLoad() {
+		// Files from 1.2.0 and older hold Max Physics Bodies, Dying Muscles and Skeletons Break Apart: they load, the
+		// old values are dropped, and the rest of the file is kept.
+		RagdollConfig config = RagdollConfig.parse("""
+				{"maxBodies": 12, "muscleSeconds": 3.0, "skeletonsBreak": false, "maxActiveRagdolls": 30, "blood": true}
+				""");
+		assertEquals(30, config.maxActiveRagdolls);
+		assertTrue(config.blood);
+		String written = config.toJson();
+		assertTrue(!written.contains("maxBodies") && !written.contains("muscleSeconds") && !written.contains("skeletonsBreak"), written);
+	}
+
+	@Test
 	void entityListsParseFromTypedText() {
 		assertEquals(List.of("minecraft:zombie", "somemod:worm"), RagdollConfig.splitIds(" zombie,somemod:worm ,, zombie "));
 		assertTrue(RagdollConfig.splitIds("   ").isEmpty());

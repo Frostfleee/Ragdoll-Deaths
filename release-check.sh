@@ -4,7 +4,7 @@
 # It checks that nothing was left out (versions, changelog, translations, mixin lists, a test run for every jar), runs the
 # unit tests, the in-game self-test on every loader and game version, and the oldest version of every shared jar, and only
 # then builds the release jars and checks each of them. Everything that failed is listed at the end and in
-# release-check-report.txt. It never retries a failed test: find the cause, fix it and run this again (see CLAUDE.md).
+# release-check-report.txt. It never retries a failed test: find the cause, fix it and run this again.
 #
 # Usage: ./release-check.sh          everything (over an hour)
 #        ./release-check.sh --quick  only the checks without the game, and the unit tests (a minute or two)

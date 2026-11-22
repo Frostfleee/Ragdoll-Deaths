@@ -2,6 +2,7 @@ package com.frostfleee.ragdolldeaths.client;
 
 import com.frostfleee.ragdolldeaths.core.RagdollConfig;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -28,7 +29,7 @@ final class EntityFilter {
 		if (entity.isSleeping() || config.isExcluded(idOf(entity.getType()))) {
 			return false;
 		}
-		if (entity.isPassenger() && !(config.throwRiders && isMountedRider(entity))) {
+		if (entity.isPassenger() && !isVehicleRider(entity) && !(config.throwRiders && isMountedRider(entity))) {
 			return false;
 		}
 		return withinRenderDistance(entity.position(), config);
@@ -36,10 +37,24 @@ final class EntityFilter {
 
 	/**
 	 * Riding a mob (a horse, a spider, a chicken, a ravager) and above any water or lava, so the body can be thrown
-	 * off. Boats, minecarts and other non-living vehicles keep the vanilla death.
+	 * off. Boats and minecarts are {@link #isVehicleRider}.
 	 */
 	static boolean isMountedRider(LivingEntity entity) {
 		return entity.getVehicle() instanceof LivingEntity && !entity.isInWater() && !entity.isInLava();
+	}
+
+	/**
+	 * Seated in a boat, a raft or a minecart (of any kind): the body slumps out of the seat with the vehicle's
+	 * momentum, whatever Thrown Riders is set to. Known by the vehicle's id, which has had different classes across
+	 * game versions; modded boats and carts named that way count too.
+	 */
+	static boolean isVehicleRider(LivingEntity entity) {
+		Entity vehicle = entity.getVehicle();
+		if (vehicle == null || vehicle instanceof LivingEntity) {
+			return false;
+		}
+		String path = BuiltInRegistries.ENTITY_TYPE.getKey(vehicle.getType()).getPath();
+		return path.endsWith("boat") || path.endsWith("raft") || path.contains("minecart");
 	}
 
 	static boolean withinRenderDistance(Vec3 position, RagdollConfig config) {

@@ -47,6 +47,7 @@ public final class RagdollTracker {
 			return;
 		}
 		StuckArrows.note(state, living);
+		Wounds.note(state, living);
 		if (living.deathTime <= 0) {
 			return;
 		}
@@ -132,10 +133,10 @@ public final class RagdollTracker {
 			return gone;
 		});
 		for (ActiveRagdoll ragdoll : active.values()) {
-			ragdoll.driveMuscles(tick, config);
+			ragdoll.driveReflexes(tick, config);
 		}
 		for (ActiveRagdoll ghost : ghosts.values()) {
-			ghost.driveMuscles(tick, config);
+			ghost.driveReflexes(tick, config);
 		}
 		PhysicsHost.INSTANCE.tick();
 		for (ActiveRagdoll ragdoll : active.values()) {
@@ -272,6 +273,7 @@ public final class RagdollTracker {
 		ghosts.clear();
 		PhysicsHost.INSTANCE.clear();
 		RecentExplosions.clear();
+		Wounds.clear();
 	}
 
 	/**
@@ -291,7 +293,7 @@ public final class RagdollTracker {
 
 	/** Makes room for one more physics body by letting the oldest one go. */
 	private void makeRoomForBody(RagdollConfig config) {
-		while (PhysicsHost.INSTANCE.count() >= config.maxBodies) {
+		while (PhysicsHost.INSTANCE.count() >= config.maxActiveRagdolls) {
 			ActiveRagdoll oldest = null;
 			for (ActiveRagdoll ghost : ghosts.values()) {
 				// a player's body kept until they respawn is not let go to make room

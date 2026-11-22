@@ -28,6 +28,17 @@ public class EntityRenderState implements RagdollRenderData.Holder {
 	private int arrows;
 	private int arrowSeed;
 	private boolean arrowsOnDead;
+	private int wounds;
+
+	@Override
+	public int ragdolldeaths$wounds() {
+		return wounds;
+	}
+
+	@Override
+	public void ragdolldeaths$setWounds(int wounds) {
+		this.wounds = wounds;
+	}
 
 	@Override
 	public int ragdolldeaths$arrows() {

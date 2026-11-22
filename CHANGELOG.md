@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.2.1
+
+### New
+- **Mobs in boats and minecarts get a body.** A mob that dies seated in a boat, a raft or a minecart (of any kind) slumps out of the seat with the vehicle's momentum and falls, instead of the vanilla death. This does not depend on Thrown Riders.
+- **25 languages.** The settings screen is now also in European Portuguese, Latin American Spanish (Mexico, Argentina, Chile, Uruguay and Venezuela), Traditional Chinese (Taiwan and Hong Kong), Japanese, Korean, Polish, Turkish, Ukrainian, Italian, Indonesian, Vietnamese, Czech and Dutch. They were written without a native speaker's check.
+
+### Changed
+- **Blood is out of beta** (still off by default), and much more of it:
+  - New particles: round drops in a few shades of red that fall and leave a small stain where they land, a puff of fine red mist where the blow struck, drips from the wound and a splatter on a hard landing.
+  - Stains on the ground: a pool spreads under the wound once the body lies still, and a hard landing leaves a stain where it hit. Stains lie flat on the block and fade away after about half a minute, and never form on water or lava.
+  - Blood on the mobs themselves: a dead body has blood on its skin around the wound and here and there, and living mobs that are hurt show blood too, more the more health they have lost. A mob keeps its blood when it dies.
+- **Skeletons always come apart.** A hard blow breaks them at once; after a gentle death the body falls whole and breaks where it lands; one that never lands (in the void, in deep water) lets its bones go after 1.5 seconds, with no throw. The **Skeletons Break Apart** setting is removed.
+- **A new settings screen.** Two settings to a row, in General, Physics, Motion and Environment, then Always Vanilla Death and the Reset to Defaults and Done buttons. The Beta section is gone: Blood is in General, Fall Reflexes and Explosion Throw are in Motion (they still need Physics Bodies on).
+- **One limit for bodies.** Max Physics Bodies is removed: physics bodies now follow **Max Bodies** (64 by default).
+- **Death Camera Circling** is now called **Death Camera Rotation**.
+- **Dying Muscles is removed**, the setting and the feature: a body is limp from the moment it dies, apart from Fall Reflexes and Leg Kicks.
+- Settings files from 1.2.0 and older still load; `maxBodies`, `muscleSeconds` and `skeletonsBreak` in them are ignored.
+
+### Fixed
+- **An elytra stayed behind.** On a body, an elytra (on a player or a mob) stayed where the wearer stood, upright, instead of turning and falling with the body. It now stays on the body's back.
+- **The block inside a sulfur cube stayed behind** (26.2 and 26.3). It now turns and falls with the cube's body.
+- **A thin limb could sink into the edge of a block.** When a body slid off a ledge, a limb as thin as an enderman's arm, dragged over the edge, could end up inside the block. It now slides over the edge.
+
 ## 1.2.0
 
 ### New

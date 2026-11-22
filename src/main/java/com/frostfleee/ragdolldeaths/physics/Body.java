@@ -76,6 +76,16 @@ public final class Body {
 		return this;
 	}
 
+	/** How many things this body pressed against in the last step (only counted while its island is awake). */
+	public int heldCount() {
+		return heldCount;
+	}
+
+	/** The body (another part, another ragdoll or a block) that contact {@code m} of the last step was with. */
+	public Body heldWith(int m) {
+		return heldWith[m];
+	}
+
 	public boolean isFixed() {
 		return invMass == 0.0;
 	}

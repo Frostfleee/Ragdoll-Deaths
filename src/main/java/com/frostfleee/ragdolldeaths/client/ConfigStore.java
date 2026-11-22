@@ -25,6 +25,9 @@ public final class ConfigStore {
 	}
 
 	public static void load() {
+		if (SelfTest.ENABLED) {
+			RagdollDeathsClient.LOGGER.info("SELFTEST settings loaded from the file (on {})", Thread.currentThread().getName());
+		}
 		Path path = path();
 		if (Files.notExists(path)) {
 			current = RagdollConfig.defaults();

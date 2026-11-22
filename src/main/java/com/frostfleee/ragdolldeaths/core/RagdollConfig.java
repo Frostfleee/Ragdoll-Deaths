@@ -28,6 +28,10 @@ public final class RagdollConfig {
 	public boolean enabled = true;
 	public double animationSpeed = 1.0;
 	public double maxRenderDistance = 64.0;
+	/**
+	 * The most bodies at once, physics bodies included; the oldest physics body goes when another one is needed. Files
+	 * from before 1.2.1 may also hold {@code maxBodies}, {@code muscleSeconds} and {@code skeletonsBreak}: Gson skips them.
+	 */
 	public int maxActiveRagdolls = 64;
 	public boolean playerRagdolls = true;
 	public boolean hideDeathTint = true;
@@ -62,10 +66,6 @@ public final class RagdollConfig {
 	 * more convincingly, at the cost of ten parts a body instead of six and limbs that are no longer vanilla's one piece.
 	 */
 	public boolean kneesAndElbows = false;
-	/** How long a dying body's muscles keep pulling before it is completely limp, in seconds. Zero is limp at once. */
-	public double muscleSeconds = 1.5;
-	/** Skeletons come apart at the joints when hit or landing hard. Off, they fall in one piece like other mobs. */
-	public boolean skeletonsBreak = true;
 	/** How much of the physics is worked out: Low is lighter on the computer, High is steadier in crowded piles. */
 	public enum Quality {
 		LOW, MEDIUM, HIGH
@@ -78,7 +78,7 @@ public final class RagdollConfig {
 	public boolean impactSounds = true;
 	/** A puff of the block's dust on a hard landing, drops of water on a splash. */
 	public boolean impactParticles = true;
-	/** Beta, off by default: a spray of blood from the killing blow, drips, and a splatter on a hard landing. */
+	/** Off by default: a spray of blood from the killing blow, drips, and a splatter on a hard landing. */
 	public boolean blood = false;
 	/** Living players and mobs that walk into a physics body push it along. The body never pushes back. */
 	public boolean pushBodies = true;
@@ -92,8 +92,6 @@ public final class RagdollConfig {
 	public boolean playerBodyUntilRespawn = true;
 	/** Arms thrown out in a forward fall, chin tucked in a backward one. */
 	public boolean reflexes = true;
-	/** The most physics bodies at once; the oldest goes when another one is needed. */
-	public int maxBodies = 48;
 	public List<String> excludedEntities = new ArrayList<>();
 
 	private transient Set<String> excludedLookup = Set.of();
@@ -126,8 +124,6 @@ public final class RagdollConfig {
 		wardenExtraTicks = Math.clamp(wardenExtraTicks, 0, MAX_WARDEN_EXTRA_TICKS);
 		ghostMaxTicks = Math.clamp(ghostMaxTicks, VANILLA_DEATH_TICKS, MAX_GHOST_TICKS);
 		bodyLifetimeTicks = Math.clamp(bodyLifetimeTicks, VANILLA_DEATH_TICKS, MAX_BODY_LIFETIME_TICKS);
-		maxBodies = Math.clamp(maxBodies, 1, 256);
-		muscleSeconds = finiteOr(muscleSeconds, defaults.muscleSeconds, 0.0, 5.0);
 		explosionStrength = finiteOr(explosionStrength, defaults.explosionStrength, 0.0, 2.0);
 		deathCameraDistance = finiteOr(deathCameraDistance, defaults.deathCameraDistance, 1.5, 10.0);
 		if (physicsQuality == null) {

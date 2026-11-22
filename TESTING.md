@@ -15,7 +15,7 @@ Every living mob in Minecraft 26.3, grouped by the animation code it uses. Check
 
 **Every loader and game version.** `./selftest-all.sh all` starts the game once per release jar group (Fabric, Quilt, NeoForge and Forge, 1.21 to 26.3) with `-Dragdolldeaths.selftest=true`. Each run creates a world, kills fifteen mobs (zombie, skeleton, creeper, spider, cow, shulker, slime, villager, enderman, piglin, horse, wolf, cat, pillager, vindicator) on a stone stage in the sky, carries one more body 90 blocks from where its mob died, kills the player, respawns, takes three screenshots, and prints one line: `PASS` when every mob became a physics body with nothing inside a block, the bodies were drawn, the dead player's body was there and followed by the death camera, it outlasted the body lifetime (Player Body Until Respawn), it was gone after the respawn, and the far-carried body was still drawn. With `EMF=1` in front, it runs with Entity Model Features and resource packs made for it (Fresh Animations, AL's packs) installed, then takes them out again. `EDGES=1` adds the oldest version of the groups built against a newer one; `./selftest.sh <loader> <-P...>` runs a single one (see `selftest-all.sh` for the values). Quilt runs start the game on the Quilt loader itself (`-PquiltRun`).
 
-**Before calling a version finished:** `./release-check.sh` runs everything above, checks that nothing was left out, builds the release jars and checks them. It must end with `RELEASE CHECK PASSED` (see `CLAUDE.md`). `./release-check.sh --quick` is the fast version without the game.
+**Before calling a version finished:** `./release-check.sh` runs everything above, checks that nothing was left out, builds the release jars and checks them. It must end with `RELEASE CHECK PASSED`. `./release-check.sh --quick` is the fast version without the game.
 
 ## Situations
 
@@ -221,7 +221,7 @@ Use `/summon creeper ~ ~ ~5 {ExplosionRadius:3}` and wait for it to blow up near
 - [x] Kill the rider while its mount is walking or galloping: it is carried forward a little as it falls
 - [x] Player on a horse (third person): thrown off and lands
 - [x] The mount is not affected and keeps moving
-- [x] Rider in a boat or minecart: vanilla death, unchanged
+- [ ] Rider in a boat or minecart (changed in 1.2.1): a zombie in a boat and one in a minecart, killed sitting still and while moving: each becomes a body that slumps out of the seat with the vehicle's momentum, with Thrown Riders on or off
 - [x] *Thrown Riders* off: riders keep the vanilla death
 
 ## 16. New in 1.1.0: uneven ground and culling
@@ -236,7 +236,7 @@ Use `/summon creeper ~ ~ ~5 {ExplosionRadius:3}` and wait for it to blow up near
 
 ## 17. New in 1.1.0: physics bodies
 
-Run the automatic scenes first: `RAGDOLL_SCENES=<names> ./gradlew runClientGameTest -PvisualTests`. Each scene saves numbered screenshots and logs, for every body, whether it came to rest and whether any part ended inside a block (the test fails if one did). `RAGDOLL_DEBUG=1` adds how each blow was read and the physics time per tick. `RAGDOLL_KNEES=1` turns Knees and Elbows on; `RAGDOLL_LIMP=1` turns dying muscles off.
+Run the automatic scenes first: `RAGDOLL_SCENES=<names> ./gradlew runClientGameTest -PvisualTests`. Each scene saves numbered screenshots and logs, for every body, whether it came to rest and whether any part ended inside a block (the test fails if one did). `RAGDOLL_DEBUG=1` adds how each blow was read and the physics time per tick. `RAGDOLL_KNEES=1` turns Knees and Elbows on; `RAGDOLL_LIMP=1` turns Fall Reflexes and Leg Kicks off.
 
 | Scene | What must happen |
 |---|---|
@@ -292,6 +292,41 @@ The self-test (`./selftest-all.sh`) checks most of this by itself: three arrows 
 - [x] A player with arrows in them, with it on: sleeves and trouser legs bend with the limb, and an arrow in a shin or forearm follows it
 - [x] On 1.21 and 1.21.1, a zombie's hat stays on its head, and a player's sleeves, jacket and trouser legs stay on their limbs, with or without it
 - [x] In lava: a horse with white markings, a villager, a drowned, a stray, a sheep, a slime, a wolf with a collar and a tropical fish all burn on their second skin too, only where lava touched them
+
+## 20. New in 1.2.1
+
+The self-test (`./selftest-all.sh`) checks most of this by itself, with Blood on for its run: a zombie villager in a boat and a drowned in a minecart become bodies, a husk wearing an elytra has its wings carried by its body, a sulfur cube holding a gold block has the block carried (26.2 and 26.3), the skeleton on the stage breaks apart on landing and one killed in the air over the void lets its bones go, blood drops, ground stains, blood on bodies and on a hurt cow are all drawn, and the settings screen opens. It does not look at the pictures: the points below are checked by eye.
+
+**Skeletons**
+- [ ] A skeleton hit hard (a sword with Knockback, a sprint hit, an explosion): it breaks apart at once and the bones scatter
+- [ ] A skeleton killed gently (`/kill`, poison, a light hit): it falls whole, then breaks apart where it lands
+- [ ] A skeleton killed over the void, and one killed in deep water: after about 1.5 seconds its bones come apart where they are, without being thrown, and drift or sink on their own
+- [ ] There is no *Skeletons Break Apart* setting
+
+**Boats and minecarts:** see section 15.
+
+**Elytra and sulfur cubes**
+- [ ] A player, a zombie and a piglin wearing an elytra, killed from the front, the back and with an explosion: the wings stay on the body's back as it falls, tumbles and lies down. A cape still follows as before
+- [ ] 26.2 and 26.3: a sulfur cube that has swallowed a block (give it one, or `item replace entity @e[type=sulfur_cube,limit=1,sort=nearest] armor.body with minecraft:gold_block`), killed: the block turns and falls with the cube and stays inside it. One holding a mob head too
+
+**Blood** (turn it on first)
+- [ ] It is named *Blood*, without "(Beta)", in General, off after *Reset to Defaults*; there is no Beta section
+- [ ] A zombie hit hard: round red drops spray out from where it was struck, with a little fine mist; drops falling on the ground leave small stains
+- [ ] The body drips for a few seconds; once it lies still a pool spreads under the wound, in two or three steps
+- [ ] A hard landing (a fall, an explosion) splatters drops and leaves a stain where it hit
+- [ ] Stains lie flat on the block, do not flicker where they overlap, and fade away after about half a minute; none form on water or lava, and none float in the air
+- [ ] The dead body has blood on its skin around the wound and in a few other places; it goes into lava and burns over the blood
+- [ ] Living mobs: hit a cow, a villager and a zombie a few times without killing them. Blood shows on them, more as their health drops (below three quarters, half and a quarter), and goes when they heal. Several of the same mob do not all look alike. The blood they had stays when they die
+- [ ] A skeleton, an iron golem, a slime, a blaze, an allay and a mannequin never bleed, alive or dead; nothing bleeds in lava
+- [ ] Blood off: no drops, stains or blood on any mob, alive or dead
+
+**Settings screen**
+- [ ] The layout, two to a row: General (Ragdoll Deaths, Player Ragdolls / Body Lifetime, Animation Speed / Max Distance, Max Bodies / Hide Death Tint, Blood / Stuck Arrows on Bodies, Stuck Arrows on Living Mobs), Physics (Physics Bodies, Physics Quality / Knees and Elbows, Impact Sounds / Impact Dust, Push Dead Bodies / Death Camera, Death Camera Distance / Death Camera Rotation, Player Body Until Respawn), Motion (Hit Push, Fall Reflexes / Explosion Throw, Bounce / Limb Animation, Leg Kicks), Environment (Water Deaths, Sink in Lava / Fall Impact, Thrown Riders), then Always Vanilla Death full width, then Reset to Defaults and Done
+- [ ] No *Max Physics Bodies*, *Dying Muscles* or *Skeletons Break Apart*; *Death Camera Circling* reads *Death Camera Rotation*
+- [ ] *Max Bodies* at 4: kill ten mobs at once; at most four bodies, the rest the vanilla death
+- [ ] A settings file from 1.2.0 (with `maxBodies`, `muscleSeconds` and `skeletonsBreak` in it) loads with its other settings kept, and those three are gone from the file after *Done*
+- [ ] Bodies go limp at once: no bracing or reaching after death, but Fall Reflexes and Leg Kicks still work
+- [ ] Switch the game to each of the 25 languages: every setting has a name and tooltip, nothing overflows its button
 
 ## Reporting
 

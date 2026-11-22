@@ -43,6 +43,7 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 	protected void addOptions() {
 		RagdollConfig c = draft;
 
+		// Two to a row, in this order (the owner's layout).
 		Compat.addHeader(list, header("general"), font);
 		list.addSmall(
 				toggle("enabled", c.enabled, v -> c.enabled = v),
@@ -52,8 +53,8 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				percent("animationSpeed", 50, 200, c.animationSpeed, v -> c.animationSpeed = v),
 				slider("maxRenderDistance", 8, 256, (int) c.maxRenderDistance, v -> Component.translatable(KEY + "blocks", v), v -> c.maxRenderDistance = v),
 				slider("maxActiveRagdolls", 4, 256, c.maxActiveRagdolls, v -> Component.literal(Integer.toString(v)), v -> c.maxActiveRagdolls = v),
-				toggle("hideDeathTint", c.hideDeathTint, v -> c.hideDeathTint = v));
-		list.addSmall(
+				toggle("hideDeathTint", c.hideDeathTint, v -> c.hideDeathTint = v),
+				toggle("blood", c.blood, v -> c.blood = v),
 				toggle("stuckArrows", c.stuckArrows, v -> c.stuckArrows = v),
 				toggle("stuckArrowsOnLiving", c.stuckArrowsOnLiving, v -> c.stuckArrowsOnLiving = v));
 
@@ -61,13 +62,7 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 		list.addSmall(
 				toggle("physicsRagdolls", c.physicsRagdolls, v -> c.physicsRagdolls = v),
 				quality(c),
-				slider("maxBodies", 4, 128, c.maxBodies, v -> Component.literal(Integer.toString(v)), v -> c.maxBodies = v),
-				percent("explosionStrength", 0, 200, c.explosionStrength, v -> c.explosionStrength = v),
-				slider("muscleSeconds", 0, 50, (int) Math.round(c.muscleSeconds * 10.0),
-						v -> Component.translatable(KEY + "wholeSeconds", String.format(Locale.ROOT, "%.1f", v / 10.0)), v -> c.muscleSeconds = v / 10.0),
-				toggle("reflexes", c.reflexes, v -> c.reflexes = v),
 				toggle("kneesAndElbows", c.kneesAndElbows, v -> c.kneesAndElbows = v),
-				toggle("skeletonsBreak", c.skeletonsBreak, v -> c.skeletonsBreak = v),
 				toggle("impactSounds", c.impactSounds, v -> c.impactSounds = v),
 				toggle("impactParticles", c.impactParticles, v -> c.impactParticles = v),
 				toggle("pushBodies", c.pushBodies, v -> c.pushBodies = v),
@@ -77,13 +72,11 @@ public final class RagdollConfigScreen extends OptionsSubScreen {
 				toggle("deathCameraCircles", c.deathCameraCircles, v -> c.deathCameraCircles = v),
 				toggle("playerBodyUntilRespawn", c.playerBodyUntilRespawn, v -> c.playerBodyUntilRespawn = v));
 
-		// Features still being worked on, off by default.
-		Compat.addHeader(list, header("beta"), font);
-		list.addSmall(toggle("blood", c.blood, v -> c.blood = v));
-
 		Compat.addHeader(list, header("motion"), font);
 		list.addSmall(
 				percent("hitReactionStrength", 0, 200, c.hitReactionStrength, v -> c.hitReactionStrength = v),
+				toggle("reflexes", c.reflexes, v -> c.reflexes = v),
+				percent("explosionStrength", 0, 200, c.explosionStrength, v -> c.explosionStrength = v),
 				percent("bounceStrength", 0, 200, c.bounceStrength, v -> c.bounceStrength = v),
 				toggle("limbAnimation", c.limbAnimation, v -> c.limbAnimation = v),
 				toggle("legKicks", c.legKicks, v -> c.legKicks = v));

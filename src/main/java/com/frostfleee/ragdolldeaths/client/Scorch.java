@@ -48,6 +48,8 @@ final class Scorch {
 	private final boolean[] burnt;
 	private final byte[] distance;
 	private boolean closed;
+	/** How much blood is on each pixel (see BloodPaint), or null while there is none. */
+	private float[] blood;
 
 	/** The layer model this texture is drawn on, or null for the mob's own model. */
 	private final Model model;
@@ -112,6 +114,54 @@ final class Scorch {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Paints blood on the skin: {@code blobs} splotches anywhere (the same pattern a living mob of this texture shows,
+	 * see Wounds) and {@code woundBlobs} bigger ones on the faces of {@code wound}, the part that was struck.
+	 */
+	void bleed(long seed, int blobs, ModelPart wound, int woundBlobs) {
+		if (closed) {
+			return;
+		}
+		if (blood == null) {
+			blood = new float[width * height];
+		}
+		java.util.Random random = new java.util.Random(seed);
+		BloodPaint.blobs(original, blood, width, height, random, blobs, null, 1.0F);
+		if (wound != null && woundBlobs > 0) {
+			java.util.List<int[]> rects = new java.util.ArrayList<>();
+			faces(wound, rects);
+			for (int i = 0; i < woundBlobs && !rects.isEmpty(); i++) {
+				BloodPaint.blobs(original, blood, width, height, random, 1, rects.get(random.nextInt(rects.size())), 1.5F);
+			}
+		}
+		repaint();
+	}
+
+	/** The texture patches of a part's faces (of its halves, for a limb cut in two), as {x0, y0, x1, y1}. */
+	private void faces(ModelPart part, java.util.List<int[]> rects) {
+		ModelPartAccessor access = (ModelPartAccessor) (Object) part;
+		Map<String, ModelPart> children = access.ragdolldeaths$children();
+		if (children.containsKey(LimbSplitter.UPPER)) {
+			for (ModelPart half : children.values()) {
+				faces(half, rects);
+			}
+			return;
+		}
+		for (ModelPart.Cube cube : access.ragdolldeaths$cubes()) {
+			for (ModelPart.Polygon face : Compat.polygons(cube)) {
+				ModelPart.Vertex[] v = Compat.vertices(face);
+				if (v.length < 4) {
+					continue;
+				}
+				int x0 = (int) Math.floor(Math.min(Compat.vu(v[0]), Compat.vu(v[1])) * width), x1 = (int) Math.ceil(Math.max(Compat.vu(v[0]), Compat.vu(v[1])) * width);
+				int y0 = (int) Math.floor(Math.min(Compat.vv(v[1]), Compat.vv(v[2])) * height), y1 = (int) Math.ceil(Math.max(Compat.vv(v[1]), Compat.vv(v[2])) * height);
+				if (x1 - x0 >= 2 && y1 - y0 >= 2) {
+					rects.add(new int[] {x0, y0, x1, y1});
+				}
+			}
+		}
 	}
 
 	/** Burns every pixel of the body's skin that is under lava right now. */
@@ -254,6 +304,9 @@ final class Scorch {
 				int d = distance[y * width + x];
 				float keep = d == 0 ? BURNT : d <= RING ? RING_NEAR : d <= far ? RING_FAR : 1.0F;
 				int argb = Compat.getPixel(original, x, y);
+				if (blood != null) {
+					argb = BloodPaint.blend(argb, blood[y * width + x]);
+				}
 				int r = (int) ((argb >> 16 & 0xFF) * keep), g = (int) ((argb >> 8 & 0xFF) * keep), b = (int) ((argb & 0xFF) * keep);
 				Compat.setPixel(pixels, x, y, argb & 0xFF000000 | r << 16 | g << 8 | b);
 			}

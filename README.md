@@ -23,7 +23,7 @@ A small, client-side visual mod. When a mob dies, its body becomes a real physic
 
 ## Installation
 
-Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.2.0 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.2.0 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
+Pick the jar for your loader and game version, for example `Ragdoll Deaths v1.2.1 - NeoForge 26.2-26.3.jar` or `Ragdoll Deaths v1.2.1 - Fabric 1.21.5-1.21.8.jar`, and put it in your `mods` folder. On Fabric and Quilt, add Fabric API too, and Mod Menu if you want the settings screen. NeoForge and Forge have the settings screen built in, under *Mods → Ragdoll Deaths → Config*.
 
 The mod is **client-only**. Servers don't need it, and every loader skips it on a dedicated server, so no rendering code ever loads server-side. In multiplayer, each player who installs it sees the ragdolls on their own screen.
 
@@ -33,18 +33,19 @@ From 1.1.0 a dead mob is a set of rigid parts joined at its joints, simulated on
 
 - **Thrown by the blow.** Melee hits knock the body back from the part that was struck; Knockback, sprint hits and Punch throw it further. Arrows hit the part they pass through. Creeper and TNT blasts fling bodies away and are blocked by walls. A mace smash drives the body down.
 - **Real contact.** Bodies land on stairs, slabs and fences, slump against walls, pile on each other, slide on ice, bounce on slime, hang in cobwebs and sink into powder snow.
-- **Dying muscles.** A body braces and reaches for about a second and a half before going limp.
+- **Fall reflexes.** Arms are thrown out in a forward fall and the chin tucks in a backward one, and a body that has landed twitches a little, less and less (Leg Kicks). Apart from that a body is limp from the moment it dies.
 - **Water and lava.** Bodies float and drift; soul sand bubble columns lift them fast and magma ones slowly. Lava burns black exactly the pixels that touched it, on the skin, on a mob's second skin (a horse's markings, a villager's clothes, a sheep's wool) and on armor, horse armor and carpets too; a held item burns black with the hand that held it in the lava. Netherite and anything else that does not burn in lava keeps its look.
-- **Special mobs.** Skeletons break apart, a snow golem's pumpkin rolls off, blaze and breeze rods drop free, spiders flip and curl.
-- **Riders.** A rider that dies on a living mount (a skeleton horseman, a spider or chicken jockey, a pillager on a ravager, a player on a horse) is a physics body too: it leaves the seat with its mount's momentum, pushed away from the blow, and tumbles to the ground.
+- **Special mobs.** Skeletons always come apart: at once from a hard blow, where they land after a gentle death, and on their own after 1.5 seconds when they never land (in the void, in deep water). A snow golem's pumpkin rolls off, blaze and breeze rods drop free, spiders flip and curl.
+- **Riders.** A rider that dies on a living mount (a skeleton horseman, a spider or chicken jockey, a pillager on a ravager, a player on a horse) is a physics body too: it leaves the seat with its mount's momentum, pushed away from the blow, and tumbles to the ground. A mob seated in a **boat** or a **minecart** gets a body too, and slumps out of the seat with the vehicle's momentum.
+- **Elytra and swallowed blocks.** An elytra stays on the back of the body that wore it and turns with it, and the block a sulfur cube has swallowed turns and falls with the cube.
 - **Mannequins** get a body like a player's.
 - **Pushing bodies.** Walk into a body and it slides along in front of you; living mobs push bodies too. It only goes one way: nothing about how players or mobs move changes.
 - **Stuck arrows.** Arrows that hit a mob stay in its dead body, as they do on players, and follow the part they are in. A second setting, off by default, shows them on living mobs too.
 - **Knees and elbows (off by default).** Limbs bend in two the way a person's do, up to 89 degrees, hinged at the front of the knee and the back of the elbow.
 - **Sounds.** Thuds, splashes and bone clatter, heard only by you.
-- **Blood (beta, off by default).** A spray from where the killing blow struck, a few drops while the body is fresh, and a splatter on a hard landing. Bones, golems, slimes, blazes, breezes, shulkers, allays, vexes and mannequins never bleed, and nothing bleeds in lava.
+- **Blood (off by default).** Drops and a fine red mist from where the killing blow struck, drips while the body is fresh, and a splatter on a hard landing. Drops leave small stains where they land, a pool spreads under a body once it lies still, and stains fade away after about half a minute. Dead bodies have blood on their skin around the wound, and living mobs that are hurt show more blood the more they are hurt. Bones, golems, slimes, blazes, breezes, shulkers, allays, vexes and mannequins never bleed, and nothing bleeds in lava. It is all drawn only on your screen.
 
-Turn **Physics Bodies** off in the settings to get the hand-made animations of 1.0 back. The sections below describe those animations; with physics on they are what the dying muscles try to do, not what is drawn.
+Turn **Physics Bodies** off in the settings to get the hand-made animations of 1.0 back. The sections below describe those animations; with physics on they are not used.
 
 ## What it does
 
@@ -117,7 +118,7 @@ In lava the special mobs use their normal body-plan death.
 
 **Explosions.** A mob killed by a creeper, TNT, a bed in the Nether or any other explosion is thrown far through the air, away from the blast. It plays its normal death on the way, the one for a hit from that direction, with its limbs trailing. Then it lands with a bounce and slides to a stop. Every explosion death throws the body: about 35 blocks right at the blast, about 10 at the edge of its reach. Heavy mobs like the iron golem and ravager fly less far, and a mob whose Blast Protection absorbs the push dies normally in place. Walls and ceilings stop the body, and a body thrown off a ledge lands on the floor below.
 
-**Riders** (with Physics Bodies off). A rider that dies on a mob it's riding is thrown off instead of dying in the saddle. This covers skeleton horsemen, spider and chicken jockeys, illagers on a ravager, and a player on a horse or camel. The rider is pushed away from the blow, carried along by its mount's momentum, and plays its fall-impact death once it hits the ground. Riders in boats and minecarts, or over water or lava, keep the vanilla death.
+**Riders** (with Physics Bodies off). A rider that dies on a mob it's riding is thrown off instead of dying in the saddle. This covers skeleton horsemen, spider and chicken jockeys, illagers on a ravager, and a player on a horse or camel. The rider is pushed away from the blow, carried along by its mount's momentum, and plays its fall-impact death once it hits the ground. Riders in boats and minecarts slump out of the seat and fall with the vehicle's momentum; riders over water or lava keep the vanilla death.
 
 **Uneven ground.** Bodies lie along the ground they fall on. A body that topples against stairs, a slab or a hillside rests tilted up on it instead of sinking in, and one that falls over a step drapes down over the edge (by at most 40° up and 30° down). The ground is measured once, where the body comes to rest.
 
@@ -129,7 +130,7 @@ Heavy mobs move slower and with less overshoot. Babies are a little quicker. Whi
 
 ### Kept vanilla on purpose
 
-These keep the plain vanilla death: the **Ender Dragon** and **Wither** (scripted boss deaths), **armor stands** (they break rather than die), the **Creaking**, and anything that dies while riding a **boat** or **minecart**.
+These keep the plain vanilla death: the **Ender Dragon** and **Wither** (scripted boss deaths), **armor stands** (they break rather than die), and the **Creaking**.
 
 **Players** get ragdolls by default; turn `playerRagdolls` off to give them the vanilla death.
 
@@ -146,10 +147,13 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | `bodyLifetimeTicks` | `100` | Body Lifetime: how long a body stays, with Physics Bodies on or off, in ticks (20–1200, 1 to 60 seconds on the settings screen). Past vanilla's 20 ticks the body is drawn client-side after the server removes the mob. |
 | `animationSpeed` | `1.0` | With Physics Bodies off: plays every death faster or slower (0.5–2). |
 | `maxRenderDistance` | `64.0` | Deaths farther from the camera use the vanilla death. |
-| `maxActiveRagdolls` | `64` | Cap on bodies animating at once. |
+| `maxActiveRagdolls` | `64` | Max Bodies: the most bodies at once, physics bodies included. When another physics body is needed the oldest one goes; past the cap, deaths use the vanilla death. |
+| `blood` | `false` | Blood: drops, stains on the ground, and blood on dead bodies and on hurt living mobs. |
 | `hideDeathTint` | `true` | Hide the red tint on dying bodies. |
 | `stuckArrows` | `true` | Arrows that hit a mob stay in its dead body. |
 | `stuckArrowsOnLiving` | `false` | Living mobs show their stuck arrows too (needs `stuckArrows`). |
+
+Files from 1.2.0 and older may also hold `maxBodies`, `muscleSeconds` and `skeletonsBreak`. They still load; those three are ignored, and dropped the next time the file is written.
 
 **Motion**
 
@@ -167,7 +171,7 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 | `waterBehavior` | `FLOAT` | `FLOAT`, `SINK` or `NEUTRAL`, for land mobs dying in water. A floating or sinking body speeds up as it goes and stays until it reaches the surface or the bottom, up to `ghostMaxTicks`. Water mobs always float. |
 | `lavaSink` | `true` | Sink into lava. |
 | `fallImpact` | `true` | With Physics Bodies off: slam flat on fall-damage deaths. |
-| `throwRiders` | `true` | Throw a rider that dies on a mob it's riding off its mount. Off, riders keep the vanilla death. |
+| `throwRiders` | `true` | Throw a rider that dies on a mob it's riding off its mount. Off, those riders keep the vanilla death. Riders in boats and minecarts always get a body. |
 
 **File only.** Both apply with Physics Bodies off. `wardenExtraTicks` (default `20`, 0–60) is the Warden's extra time, and `ghostMaxTicks` (default `60`, 20–100) is the longest a body may keep falling over the void (with a floor below, it falls until it lands), or floating up to the surface or sinking to the bottom in water. These two aren't on the settings screen.
 
@@ -183,29 +187,28 @@ On NeoForge and Forge, or on Fabric and Quilt with **Mod Menu** installed, open 
 |---|---|---|
 | Physics Bodies | On | Real physics bodies. Off brings back the 1.0 animations. |
 | Physics Quality | Medium | Low is lighter and bodies stop piling on each other; High is steadier in piles. |
-| Max Physics Bodies | 48 | The oldest vanishes when another is needed. |
-| Explosion Throw | 100% | How hard explosions throw bodies. |
-| Dying Muscles | 1.5 s | How long a body braces before going limp. |
-| Fall Reflexes | On | Arms out in a forward fall, chin tucked in a backward one. |
 | Knees and Elbows | Off | Cuts arms and legs in two so bodies bend at the knee and elbow, only the way a person's do and up to 89 degrees. |
-| Skeletons Break Apart | On | Off, skeletons fall in one piece. |
 | Impact Sounds | On | Thuds, splashes, bone clatter. |
 | Impact Dust | On | Block dust on hard landings, drops on splashes. |
 | Push Dead Bodies | On | Players and living mobs that walk into a body push it along. The body never pushes back, so moving stays vanilla. |
 | Death Camera | On | While you are dead, the view follows your body's head and slowly circles it. |
 | Death Camera Distance | 3.5 blocks | How far the death camera stays from your body. |
-| Death Camera Circling | On | Whether the death camera circles your body or holds its angle. |
+| Death Camera Rotation | On | Whether the death camera circles your body or holds its angle. |
 | Player Body Until Respawn | On | A player's body stays until they respawn, instead of going after the body lifetime. |
-| Stuck Arrows on Bodies | On | Arrows that hit a mob stay in its dead body, the way they show on players, until the body disappears. |
-| Stuck Arrows on Living Mobs | Off | Living mobs show the arrows stuck in them too. Needs Stuck Arrows on Bodies. |
 
-### Beta settings
+In the Motion section, two more need Physics Bodies on: **Fall Reflexes** (on: arms out in a forward fall, chin tucked in a backward one) and **Explosion Throw** (100%: how hard explosions throw bodies).
 
-Features still being worked on, off by default.
+The settings screen has two settings to a row, in this order:
 
-| Setting | Default | What it does |
-|---|---|---|
-| Blood (Beta) | Off | A spray of blood from the killing blow, drips, and a splatter on hard landings. |
+| Section | Settings |
+|---|---|
+| General | Ragdoll Deaths, Player Ragdolls, Body Lifetime, Animation Speed, Max Distance, Max Bodies, Hide Death Tint, Blood, Stuck Arrows on Bodies, Stuck Arrows on Living Mobs |
+| Physics | Physics Bodies, Physics Quality, Knees and Elbows, Impact Sounds, Impact Dust, Push Dead Bodies, Death Camera, Death Camera Distance, Death Camera Rotation, Player Body Until Respawn |
+| Motion | Hit Push, Fall Reflexes, Explosion Throw, Bounce, Limb Animation, Leg Kicks |
+| Environment | Water Deaths, Sink in Lava, Fall Impact, Thrown Riders |
+| Always Vanilla Death | the list of entity ids, full width |
+
+The settings screen is in 25 languages: English, Brazilian and European Portuguese, Spanish (Spain, and one Latin American text for Mexico, Argentina, Chile, Uruguay and Venezuela), French, German, Italian, Dutch, Polish, Czech, Russian, Ukrainian, Turkish, Simplified Chinese, Traditional Chinese (Taiwan and Hong Kong), Japanese, Korean, Indonesian and Vietnamese. No native speaker has checked the translations yet.
 
 ## Compatibility philosophy
 

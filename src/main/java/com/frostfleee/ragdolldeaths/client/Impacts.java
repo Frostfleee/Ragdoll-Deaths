@@ -84,7 +84,7 @@ final class Impacts {
 					level.playLocalSound(b.x, b.y, b.z, sound, SoundSource.NEUTRAL, volume, pitch, false);
 				}
 				if (Blood.active(ragdoll, config) && hardest > Blood.SPLATTER) {
-					Blood.splatter(level, b, hardest, random);
+					Blood.splatter(ragdoll, level, b, hardest, random);
 				}
 				if (config.impactParticles && hardest > DUST) {
 					int puffs = Math.min(10, (int) (hardest / 3.0));

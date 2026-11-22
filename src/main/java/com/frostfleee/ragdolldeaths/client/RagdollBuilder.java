@@ -56,8 +56,6 @@ final class RagdollBuilder {
 		Piece parent;
 		/** The matrix of the part this one is attached to in the model, as posed. */
 		Matrix4f parentSpace;
-		/** The part's angles on the frame the mob died, before anything else poses the model. */
-		float[] died;
 		final Vector3f centre = new Vector3f();
 		final Vector3f half = new Vector3f();
 		double weight;
@@ -159,7 +157,7 @@ final class RagdollBuilder {
 		if (Blood.active(ragdoll, ConfigStore.get())) {
 			Blood.blow(ragdoll, DeathBlow.lastStrength);
 		}
-		ragdoll.muscles = muscles(root, pieces, jointArray, entity);
+		ragdoll.reflexes = reflexes(root, pieces, jointArray, entity);
 		Island island = new Island(bodies, jointArray);
 		// Parts that already overlap where the model puts them (a spider's eight legs meet at its body) must not be
 		// pushed apart: that would fling them. Only the joints hold those pairs together.
@@ -168,21 +166,15 @@ final class RagdollBuilder {
 		ragdoll.special = SpecialBodies.create(ragdoll, entity, DeathBlow.lastStrength, ConfigStore.get());
 	}
 
-	/** Gives every joint its dying muscle: which animation joint it follows and how much weight hangs from it. */
-	private static Muscles muscles(ModelPart root, List<Piece> pieces, Joint[] joints, LivingEntity entity) {
+	/** Gives every joint its reflexes: which part of the animation rig it is and how much weight hangs from it. */
+	private static Reflexes reflexes(ModelPart root, List<Piece> pieces, Joint[] joints, LivingEntity entity) {
 		List<JointRig.Joint> rig = JointRig.of(root).joints;
 		Piece torso = pieces.getFirst();
-		int torsoIndex = 0;
-		for (JointRig.Joint named : rig) {
-			if (named.part() == torso.part) {
-				torsoIndex = named.index();
-			}
-		}
-		List<Muscles.Fibre> fibres = new ArrayList<>();
+		List<Reflexes.Fibre> fibres = new ArrayList<>();
 		for (int i = 1; i < pieces.size(); i++) {
 			Piece piece = pieces.get(i);
 			Joint joint = joints[i - 1];
-			// A lower half follows its limb's animation joint; the limb's own muscle carries both halves.
+			// A lower half follows its limb's animation joint; the limb's own reflex carries both halves.
 			ModelPart animated = piece.upper == null ? piece.part : piece.upper.part;
 			JointRig.Joint named = null;
 			for (JointRig.Joint candidate : rig) {
@@ -196,18 +188,18 @@ final class RagdollBuilder {
 			Body hung = piece.body;
 			Body from = piece.upper != null ? piece.upper.body : piece.parent != null ? piece.parent.body : torso.body;
 			// The joint sits where the two bodies meet; the limb's weight acts at its middle.
-			double torque = Muscles.weightTorque(hung.mass, distance(hung, from) * 0.5);
+			double torque = Reflexes.weightTorque(hung.mass, distance(hung, from) * 0.5);
 			for (Piece other : pieces) {
 				if (other.upper == piece) {
-					torque += Muscles.weightTorque(other.body.mass, distance(other.body, from) * 0.75);
+					torque += Reflexes.weightTorque(other.body.mass, distance(other.body, from) * 0.75);
 				}
 			}
 			var rest = Rest.of(animated);
-			fibres.add(new Muscles.Fibre(joint, piece.role, named.side(), named.index(), piece.upper != null, piece.parent != null,
-					new float[] {rest.xRot(), rest.yRot(), rest.zRot()}, piece.upper == null ? piece.died : piece.upper.died, torque));
+			fibres.add(new Reflexes.Fibre(joint, piece.role, named.side(), piece.upper != null, piece.parent != null,
+					new float[] {rest.xRot(), rest.yRot(), rest.zRot()}, torque));
 		}
 		var torsoRest = Rest.of(torso.part);
-		return new Muscles(fibres, torsoIndex, new float[] {torsoRest.xRot(), torsoRest.yRot(), torsoRest.zRot()}, torso.died,
+		return new Reflexes(fibres, new float[] {torsoRest.xRot(), torsoRest.yRot(), torsoRest.zRot()},
 				entity.getUUID().getMostSignificantBits() ^ entity.level().getGameTime());
 	}
 
@@ -432,7 +424,6 @@ final class RagdollBuilder {
 		piece.matrix = new Matrix4f(rootMatrix);
 		piece.parentSpace = new Matrix4f(rootMatrix);
 		piece.rest = Rest.ZERO;
-		piece.died = new float[3];
 		piece.centre.set((bounds[0] + bounds[3]) / 2.0F, (bounds[1] + bounds[4]) / 2.0F, (bounds[2] + bounds[5]) / 2.0F);
 		piece.half.set((bounds[3] - bounds[0]) / 2.0F, (bounds[4] - bounds[1]) / 2.0F, (bounds[5] - bounds[2]) / 2.0F);
 		piece.weight = piece.half.x * piece.half.y * piece.half.z;
@@ -492,7 +483,6 @@ final class RagdollBuilder {
 		piece.role = role;
 		piece.matrix = matrix;
 		piece.rest = rest;
-		piece.died = new float[] {part.xRot, part.yRot, part.zRot};
 		// Parts smaller than this many pixels every way (a parrot's feet) just ride on what they are attached to.
 		if (Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ)) < MIN_PIECE_PIXELS) {
 			return null;
